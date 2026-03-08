@@ -150,8 +150,9 @@ local function FindWord(prefix)
             and not UsedWords[word] and not SavedWords[word] then
             -- Filter suffix kalau Counter ON
             if CounterOn and CounterSuffix ~= "" then
-                local lastChar = string.sub(word, -1)
-                if lastChar ~= string.lower(CounterSuffix) then
+                local suffix = string.lower(CounterSuffix)
+                local wordEnd = string.sub(word, -#suffix)
+                if wordEnd ~= suffix then
                     continue
                 end
             end
@@ -181,11 +182,10 @@ local function Submit(word)
     TotalUsed = TotalUsed + 1
 end
 
-local function PlayNormal(word, startFrom)
+local function PlayNormal(word)
     if not word then return end
     task.wait(CFG.Delay)
-    local from = startFrom or 0
-    for i = from + 1, #word do
+    for i = 1, #word do
         if not IsRunning then return end
         local partial = string.sub(word, 1, i)
         pcall(function()
@@ -233,9 +233,21 @@ local function StartAuto()
                     CurrentSum  = word
                     if currentWordLabel then
                         currentWordLabel.Text = "📝 " .. word
+                        currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
                     end
+
+                    -- Manual mode: tampilkan kata di Sum, tidak auto fire
+                    -- User ketik sendiri, tap Sum untuk ganti kata
+                    if SelectedMode == "Manual" then
+                        -- Tunggu sampai mode berubah atau prefix berubah
+                        while IsRunning and SelectedMode == "Manual" and GetBoardPrefix() == prefix do
+                            task.wait(0.3)
+                        end
+                        continue
+                    end
+
                     if SelectedMode == "Normal" then
-                        PlayNormal(word, #prefix)
+                        PlayNormal(word)
                     elseif SelectedMode == "Mid" then
                         PlayMid(word)
                     else
@@ -271,7 +283,7 @@ local function StartAuto()
                             end
                             -- Update billboard ke kata baru (belum submit)
                             if SelectedMode == "Normal" then
-                                PlayNormal(retry, #lastPrefix)
+                                PlayNormal(retry)
                             elseif SelectedMode == "Mid" then
                                 PlayMid(retry)
                             else
@@ -772,8 +784,8 @@ local function buildMainUI()
     mkLabel(container, "Mode Auto", y, 20, 11, false, Color3.fromRGB(100,110,140))
     y = y + 24
 
-    -- Mode selector: 3 tombol horizontal
-    local MODES = {"Normal", "Mid", "Brutal"}
+    -- Mode selector: 4 tombol horizontal
+    local MODES = {"Normal", "Mid", "Brutal", "Manual"}
     local modeButtons = {}
     local modeBg = Instance.new("Frame")
     modeBg.Size = UDim2.new(1, -16, 0, 36)
@@ -785,14 +797,12 @@ local function buildMainUI()
 
     local COL_ON  = Color3.fromRGB(40, 180, 80)
     local COL_OFF = Color3.fromRGB(160, 165, 180)
-    local btnW = math.floor((1/#MODES) * 100)
 
     local function refreshModeButtons()
         for _, info in ipairs(modeButtons) do
             local isActive = (info.mode == SelectedMode)
-            TweenService:Create(info.btn, TweenInfo.new(0.15), {
-                BackgroundColor3 = isActive and COL_ON or COL_OFF
-            }):Play()
+            -- Set langsung tanpa tween supaya visual selalu sync saat rebuild
+            info.btn.BackgroundColor3 = isActive and COL_ON or COL_OFF
         end
     end
 
@@ -800,10 +810,11 @@ local function buildMainUI()
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1/#MODES, i < #MODES and -2 or 0, 1, -6)
         btn.Position = UDim2.new((i-1)/#MODES, i == 1 and 3 or 1, 0, 3)
+        -- Baca SelectedMode langsung saat build (fix bug visual reset)
         btn.BackgroundColor3 = (modeName == SelectedMode) and COL_ON or COL_OFF
         btn.Text = modeName
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 12
+        btn.TextSize = 11
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.BorderSizePixel = 0
         btn.Parent = modeBg
@@ -934,7 +945,7 @@ local function buildMainUI()
     wordBox.Parent = container
     mkCorner(wordBox, 8)
 
-    local wordLbl = Instance.new("TextLabel")
+    local wordLbl = Instance.new("TextButton")
     wordLbl.Size = UDim2.new(1, -12, 1, 0)
     wordLbl.Position = UDim2.new(0, 6, 0, 0)
     wordLbl.BackgroundTransparency = 1
@@ -943,7 +954,25 @@ local function buildMainUI()
     wordLbl.TextSize = 13
     wordLbl.TextColor3 = Color3.fromRGB(40, 120, 255)
     wordLbl.TextXAlignment = Enum.TextXAlignment.Left
+    wordLbl.BorderSizePixel = 0
     wordLbl.Parent = wordBox
+
+    -- Tap Sum = ganti kata (hanya di Manual mode)
+    wordLbl.MouseButton1Click:Connect(function()
+        if SelectedMode ~= "Manual" then return end
+        local prefix = GetBoardPrefix()
+        if not prefix then return end
+        local next = FindWord(prefix)
+        if next then
+            CurrentSum = next
+            wordLbl.Text = "📝 " .. next
+            wordLbl.TextColor3 = Color3.fromRGB(40, 120, 255)
+        else
+            wordLbl.Text = "⚠️ Kata habis"
+            wordLbl.TextColor3 = Color3.fromRGB(220, 120, 30)
+        end
+    end)
+
     currentWordLabel = wordLbl
     y = y + 48
 
@@ -1093,8 +1122,9 @@ local function buildSettingsUI()
     inputBox.Parent = inputBg
 
     inputBox.FocusLost:Connect(function()
-        -- Hanya ambil 1 huruf pertama
-        local val = inputBox.Text:match("^%s*(%a)") or ""
+        -- Ambil semua huruf (bisa lebih dari 1)
+        local val = inputBox.Text:match("^%s*(.-)%s*$") or ""
+        val = val:gsub("[^%a]", "") -- hapus non-huruf
         CounterSuffix = string.lower(val)
         inputBox.Text = string.upper(CounterSuffix)
     end)
@@ -1247,6 +1277,8 @@ task.wait(0.5)
 lotusBtn.Rotation = -180
 TweenService:Create(lotusBtn, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Rotation = 0}):Play()
 
-print("🌸 LuluFish V5 Kosa Kata Indo - Loaded!")
-print("update bug logic")
-print("⚙️ Main | 🔧 Misc")
+print("================================")
+print("🌸 LuluFish V5 | Kosa Kata Indo")
+print("================================")
+print("📋 Changelog:")
+print("mode update&Change")
