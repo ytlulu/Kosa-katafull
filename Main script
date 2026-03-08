@@ -35,10 +35,9 @@ local CurrentSum   = "—"   -- kata terakhir yang disubmit
 -- SETTINGS
 -- ============================================================
 local CFG = {
-    Delay      = 0.5,   -- detik tunggu setelah board muncul sebelum mulai
-    Speed      = 0.10,  -- interval per karakter BillboardUpdate (Normal mode)
-    FireSpeed  = 0.6,   -- jeda antar submit kata
-    RetryDelay = 1.0,   -- jeda sebelum retry setelah gagal
+    Delay      = 0.5,
+    Speed      = 0.10,
+    FireSpeed  = 0.6,
 }
 
 -- ============================================================
@@ -186,13 +185,6 @@ local function PlayNormal(word, startFrom)
     if not word then return end
     task.wait(CFG.Delay)
     local from = startFrom or 0
-    -- Clear dulu kalau from = 0 (tidak ada prefix), hindari sisa teks sebelumnya
-    if from == 0 then
-        pcall(function()
-            ReplicatedStorage.Remotes.BillboardUpdate:FireServer("")
-        end)
-        task.wait(0.05)
-    end
     for i = from + 1, #word do
         if not IsRunning then return end
         local partial = string.sub(word, 1, i)
@@ -256,35 +248,48 @@ local function StartAuto()
                         task.wait(0.5)
                         local boardNow = GetBoardPrefix()
                         if boardNow then
-                            -- Board masih ada setelah cek ke-2 = gagal pasti
                             if check == 2 then
                                 failed = true
                             end
-                            -- Cek 1 masih ada, lanjut ke cek 2
                         else
-                            -- Board hilang = sukses, stop cek
                             break
                         end
                     end
 
                     if failed then
-                        if currentWordLabel then
-                            currentWordLabel.Text = "❌ Gagal, retry..."
-                        end
-                        -- Reset billboard ke prefix awal
-                        pcall(function()
-                            ReplicatedStorage.Remotes.BillboardUpdate:FireServer(lastPrefix)
-                        end)
-                        task.wait(CFG.RetryDelay)
                         SavedWords[word] = nil
+                        UsedWords[word]  = true
                         TotalUsed = math.max(0, TotalUsed - 1)
+
+                        -- Cari kata lain, update billboard langsung (belum fire)
+                        local retry = FindWord(lastPrefix)
+                        if retry then
+                            CurrentSum = retry
+                            if currentWordLabel then
+                                currentWordLabel.Text = "🔄 " .. retry
+                                currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
+                            end
+                            -- Update billboard ke kata baru (belum submit)
+                            if SelectedMode == "Normal" then
+                                PlayNormal(retry, #lastPrefix)
+                            elseif SelectedMode == "Mid" then
+                                PlayMid(retry)
+                            else
+                                PlayRisk(retry)
+                            end
+                        else
+                            if currentWordLabel then
+                                currentWordLabel.Text = "⚠️ Kata habis"
+                                currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
+                            end
+                        end
                     end
                     continue
                 else
                     -- Tidak ada kata di kosa kata untuk prefix ini
                     CurrentBill = prefix
                     if currentWordLabel then
-                        currentWordLabel.Text = "⚠️ Input manual"
+                        currentWordLabel.Text = "⚠️ Tidak ada kata"
                         currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
                     end
                 end
@@ -904,11 +909,6 @@ local function buildMainUI()
     end)
     y = y + 44
 
-    mkNumberInput("Retry Delay (gagal)", y, CFG.RetryDelay, 0.5, 0.5, 10, function(v)
-        CFG.RetryDelay = v
-    end)
-    y = y + 44
-
     mkDivider(container, y)
     y = y + 12
 
@@ -1248,4 +1248,5 @@ lotusBtn.Rotation = -180
 TweenService:Create(lotusBtn, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Rotation = 0}):Play()
 
 print("🌸 LuluFish V5 Kosa Kata Indo - Loaded!")
+print("update bug logic")
 print("⚙️ Main | 🔧 Misc")
