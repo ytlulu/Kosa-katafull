@@ -1,0 +1,1215 @@
+-- ============================================================
+--   LuluFish V4 | Map: Kosa Kata Indo
+--   UI Manual (No Library)
+-- ============================================================
+
+local TweenService     = game:GetService("TweenService")
+local Players          = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage= game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local playerGui   = LocalPlayer:WaitForChild("PlayerGui")
+local guiParent   = (gethui and gethui()) or game:GetService("CoreGui") or playerGui
+
+math.randomseed(os.clock() * 100000)
+
+-- ============================================================
+-- STATE
+-- ============================================================
+local Username     = ""
+local SelectedMode = "Normal"
+local IsRunning    = false
+local AutoTask     = nil
+local AutoDetect   = true
+local SavedWords   = {}
+local UsedWords    = {}
+local TotalUsed    = 0     -- counter kumulatif kata yang sudah dipakai
+local ShowInfo     = true
+local CounterOn    = false
+local CounterSuffix = ""   -- huruf akhiran yang diinginkan
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+local CFG = {
+    Delay      = 0.5,   -- detik tunggu setelah board muncul sebelum mulai
+    Speed      = 0.10,  -- interval per karakter BillboardUpdate (Normal mode)
+    FireSpeed  = 0.6,   -- jeda antar submit kata
+    RetryDelay = 1.0,   -- jeda sebelum retry setelah gagal
+}
+
+-- ============================================================
+-- LOAD KOSA KATA
+-- ============================================================
+local KATA_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/main/kosakata_KBBI.txt"
+local KOSA_KATA = {}
+local KATA_INDEX= {}
+
+local function BuildIndex()
+    KATA_INDEX = {}
+    for _, word in ipairs(KOSA_KATA) do
+        local first = string.upper(string.sub(word, 1, 1))
+        if not KATA_INDEX[first] then KATA_INDEX[first] = {} end
+        table.insert(KATA_INDEX[first], word)
+    end
+end
+
+local function LoadKata(statusLabel)
+    task.spawn(function()
+        task.wait(0.3)
+        if statusLabel then statusLabel.Text = "⏳ Memuat kosa kata..." end
+        local ok, result = pcall(function()
+            return game:HttpGet(KATA_URL, true)
+        end)
+        if not ok or not result then
+            warn("Gagal load kata")
+            if statusLabel then statusLabel.Text = "❌ Gagal load kosa kata!" end
+            return
+        end
+        KOSA_KATA = {}
+        local seen = {}
+        for line in result:gmatch("[^\n]+") do
+            local word = line:match("^%s*(.-)%s*$")
+            if word and #word >= 2 then
+                local hasSpace = word:find("%s")
+                if hasSpace then
+                    for part in word:gmatch("%S+") do
+                        local p = string.lower(part)
+                        if #p >= 2 and not seen[p] then
+                            seen[p] = true
+                            table.insert(KOSA_KATA, p)
+                        end
+                    end
+                else
+                    local w = string.lower(word)
+                    if not seen[w] then
+                        seen[w] = true
+                        table.insert(KOSA_KATA, w)
+                    end
+                end
+            end
+        end
+        BuildIndex()
+        print("✅ Loaded kata:", #KOSA_KATA)
+        if statusLabel then
+            statusLabel.Text = "✅ " .. #KOSA_KATA .. " kata dimuat"
+            statusLabel.TextColor3 = Color3.fromRGB(50, 180, 80)
+        end
+    end)
+end
+
+-- ============================================================
+-- GAME LOGIC
+-- ============================================================
+local function DetectPlayer()
+    if LocalPlayer.Character then
+        return LocalPlayer.Character.Name
+    end
+    return nil
+end
+
+local function GetBoardPrefix()
+    if AutoDetect then Username = DetectPlayer() end
+    if not Username or Username == "" then return nil end
+    local ok, prefix = pcall(function()
+        local target = workspace:FindFirstChild(Username)
+        if not target then return nil end
+        local head = target:FindFirstChild("Head")
+        if not head then return nil end
+        local billboard = head:FindFirstChild("TurnBillboard")
+        if not billboard then return nil end
+        local label = billboard:FindFirstChildWhichIsA("TextLabel", true)
+        if not label then return nil end
+        local text = label.Text
+        if not text or text == "" then return nil end
+        -- Ambil seluruh teks board (huruf kapital semua), bukan cuma 1 huruf
+        return string.upper(text:match("^%s*(.-)%s*$") or "")
+    end)
+    if ok and prefix and #prefix > 0 then return prefix end
+    return nil
+end
+
+local function FindWord(prefix)
+    if not prefix or #prefix == 0 then return nil end
+    local lowerPrefix = string.lower(prefix)
+    local firstLetter = string.upper(string.sub(prefix, 1, 1))
+    local candidates = KATA_INDEX[firstLetter] or {}
+
+    local available = {}
+    for _, word in ipairs(candidates) do
+        if string.sub(word, 1, #lowerPrefix) == lowerPrefix
+            and not UsedWords[word] and not SavedWords[word] then
+            -- Filter suffix kalau Counter ON
+            if CounterOn and CounterSuffix ~= "" then
+                local lastChar = string.sub(word, -1)
+                if lastChar ~= string.lower(CounterSuffix) then
+                    continue
+                end
+            end
+            table.insert(available, word)
+        end
+    end
+    -- Fallback: kalau tidak ada kata yang match suffix, cari tanpa filter suffix
+    if #available == 0 and CounterOn and CounterSuffix ~= "" then
+        for _, word in ipairs(candidates) do
+            if string.sub(word, 1, #lowerPrefix) == lowerPrefix
+                and not UsedWords[word] and not SavedWords[word] then
+                table.insert(available, word)
+            end
+        end
+    end
+    if #available == 0 then return nil end
+    local picked = available[math.random(#available)]
+    UsedWords[picked] = true
+    return picked
+end
+
+local function Submit(word)
+    pcall(function()
+        ReplicatedStorage.Remotes.SubmitWord:FireServer(word)
+    end)
+    SavedWords[word] = true
+    TotalUsed = TotalUsed + 1
+end
+
+local function PlayNormal(word, startFrom)
+    if not word then return end
+    task.wait(CFG.Delay)
+    -- startFrom = panjang prefix yang sudah ada di billboard, mulai dari situ
+    local from = startFrom or 0
+    for i = from + 1, #word do
+        if not IsRunning then return end
+        local partial = string.sub(word, 1, i)
+        pcall(function()
+            ReplicatedStorage.Remotes.BillboardUpdate:FireServer(partial)
+        end)
+        task.wait(CFG.Speed)
+    end
+    task.wait(0.1)
+    Submit(word)
+end
+
+local function PlayMid(word)
+    if not word then return end
+    task.wait(CFG.Delay)
+    pcall(function()
+        ReplicatedStorage.Remotes.BillboardUpdate:FireServer(word)
+    end)
+    task.wait(0.2)
+    Submit(word)
+end
+
+local function PlayRisk(word)
+    if not word then return end
+    task.wait(CFG.Delay)
+    Submit(word)
+end
+
+local currentWordLabel = nil  -- diisi setelah GUI dibuat
+
+local function StartAuto()
+    if IsRunning then return end
+    IsRunning = true
+    AutoTask = task.spawn(function()
+        local lastPrefix = nil
+        while IsRunning do
+            local prefix = GetBoardPrefix()
+            if prefix then
+                if prefix ~= lastPrefix then
+                    lastPrefix = prefix
+                    UsedWords  = {}
+                end
+                local word = FindWord(prefix)
+                if word then
+                    if currentWordLabel then
+                        currentWordLabel.Text = "📝 " .. word
+                    end
+                    if SelectedMode == "Normal" then
+                        PlayNormal(word, #prefix)
+                    elseif SelectedMode == "Mid" then
+                        PlayMid(word)
+                    else
+                        PlayRisk(word)
+                    end
+                    task.wait(CFG.FireSpeed)
+
+                    -- Cek gagal
+                    local afterPrefix = GetBoardPrefix()
+                    if afterPrefix and afterPrefix == lastPrefix and IsRunning then
+                        if currentWordLabel then
+                            currentWordLabel.Text = "❌ Gagal, retry..."
+                        end
+                        pcall(function()
+                            ReplicatedStorage.Remotes.BillboardUpdate:FireServer(lastPrefix)
+                        end)
+                        task.wait(CFG.RetryDelay)
+                        SavedWords[word] = nil
+                        TotalUsed = math.max(0, TotalUsed - 1)
+                    end
+                    continue
+                end
+            else
+                lastPrefix = nil
+                if currentWordLabel then currentWordLabel.Text = "⏳ Menunggu board..." end
+            end
+            task.wait(0.3)
+        end
+        if currentWordLabel then currentWordLabel.Text = "⏸ Stopped" end
+    end)
+end
+
+local function StopAuto()
+    IsRunning = false
+    if AutoTask then
+        task.cancel(AutoTask)
+        AutoTask = nil
+    end
+end
+
+-- ============================================================
+-- GUI HELPERS (style dari LuluFish V3)
+-- ============================================================
+local function makeHover(btn, base, hov)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = hov}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = base}):Play()
+    end)
+end
+
+local function mkCorner(parent, radius)
+    local c = Instance.new("UICorner", parent)
+    c.CornerRadius = UDim.new(0, radius or 8)
+    return c
+end
+
+local function mkLabel(parent, text, yOff, h, size, bold, color)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -16, 0, h)
+    l.Position = UDim2.new(0, 8, 0, yOff)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
+    l.TextSize = size or 13
+    l.TextColor3 = color or Color3.fromRGB(40, 50, 70)
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = parent
+    return l
+end
+
+local function mkBtn(parent, text, yOff, h, col)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -16, 0, h)
+    b.Position = UDim2.new(0, 8, 0, yOff)
+    b.BackgroundColor3 = col or Color3.fromRGB(40, 120, 255)
+    b.Text = text
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.BorderSizePixel = 0
+    b.Parent = parent
+    mkCorner(b, 8)
+    local hov = Color3.fromRGB(
+        math.clamp(col and col.R*255+25 or 65, 0, 255),
+        math.clamp(col and col.G*255+25 or 145, 0, 255),
+        math.clamp(col and col.B*255+25 or 255, 0, 255)
+    )
+    makeHover(b, col or Color3.fromRGB(40,120,255), hov)
+    return b
+end
+
+-- Divider
+local function mkDivider(parent, yOff)
+    local d = Instance.new("Frame")
+    d.Size = UDim2.new(1, -16, 0, 1)
+    d.Position = UDim2.new(0, 8, 0, yOff)
+    d.BackgroundColor3 = Color3.fromRGB(220, 225, 235)
+    d.BorderSizePixel = 0
+    d.Parent = parent
+    return d
+end
+
+-- Toggle button (on/off style)
+local function mkToggle(parent, label, yOff, default, callback)
+    local state = {default}
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, -16, 0, 36)
+    bg.Position = UDim2.new(0, 8, 0, yOff)
+    bg.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
+    bg.BorderSizePixel = 0
+    bg.Parent = parent
+    mkCorner(bg, 8)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -60, 1, 0)
+    lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.TextColor3 = Color3.fromRGB(40, 50, 70)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = bg
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(0, 42, 0, 22)
+    track.Position = UDim2.new(1, -52, 0.5, -11)
+    track.BackgroundColor3 = default and Color3.fromRGB(40,180,80) or Color3.fromRGB(190,195,210)
+    track.BorderSizePixel = 0
+    track.Parent = bg
+    mkCorner(track, 11)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = default and UDim2.new(0, 22, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = track
+    mkCorner(knob, 9)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = bg
+
+    btn.MouseButton1Click:Connect(function()
+        state[1] = not state[1]
+        local on = state[1]
+        TweenService:Create(track, TweenInfo.new(0.2), {
+            BackgroundColor3 = on and Color3.fromRGB(40,180,80) or Color3.fromRGB(190,195,210)
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.2), {
+            Position = on and UDim2.new(0,22,0.5,-9) or UDim2.new(0,2,0.5,-9)
+        }):Play()
+        callback(on)
+    end)
+
+    return bg
+end
+
+-- Dropdown
+local function mkDropdown(parent, label, options, default, yOff, callback)
+    local selected = {default}
+    local open = {false}
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, -16, 0, 36)
+    bg.Position = UDim2.new(0, 8, 0, yOff)
+    bg.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
+    bg.BorderSizePixel = 0
+    bg.ClipsDescendants = false
+    bg.Parent = parent
+    mkCorner(bg, 8)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.55, 0, 1, 0)
+    lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.TextColor3 = Color3.fromRGB(40, 50, 70)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = bg
+
+    local valBtn = Instance.new("TextButton")
+    valBtn.Size = UDim2.new(0, 110, 0, 28)
+    valBtn.Position = UDim2.new(1, -118, 0.5, -14)
+    valBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+    valBtn.Text = default .. " ▾"
+    valBtn.Font = Enum.Font.GothamBold
+    valBtn.TextSize = 12
+    valBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valBtn.BorderSizePixel = 0
+    valBtn.Parent = bg
+    mkCorner(valBtn, 6)
+
+    -- dropMenu di-parent ke rightPanel supaya tidak ter-clip scroll/container
+    -- posisi dihitung saat dibuka
+    local dropMenu = Instance.new("Frame")
+    dropMenu.Size = UDim2.new(0, 110, 0, #options * 32)
+    dropMenu.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    dropMenu.BorderSizePixel = 0
+    dropMenu.Visible = false
+    dropMenu.ZIndex = 200
+    mkCorner(dropMenu, 8)
+
+    -- shadow
+    local ds = Instance.new("Frame")
+    ds.Size = UDim2.new(1, 8, 1, 8)
+    ds.Position = UDim2.new(0, -4, 0, -4)
+    ds.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+    ds.BackgroundTransparency = 0.85
+    ds.BorderSizePixel = 0
+    ds.ZIndex = 199
+    ds.Parent = dropMenu
+    mkCorner(ds, 10)
+
+    for i, opt in ipairs(options) do
+        local ob = Instance.new("TextButton")
+        ob.Size = UDim2.new(1, 0, 0, 32)
+        ob.Position = UDim2.new(0, 0, 0, (i-1)*32)
+        ob.BackgroundTransparency = 1
+        ob.Text = opt
+        ob.Font = Enum.Font.Gotham
+        ob.TextSize = 13
+        ob.TextColor3 = Color3.fromRGB(40, 50, 70)
+        ob.ZIndex = 201
+        ob.Parent = dropMenu
+        makeHover(ob, Color3.fromRGB(255,255,255), Color3.fromRGB(235,240,255))
+        ob.BackgroundTransparency = 1
+
+        ob.MouseButton1Click:Connect(function()
+            selected[1] = opt
+            valBtn.Text = opt .. " ▾"
+            dropMenu.Visible = false
+            dropMenu.Parent = nil
+            open[1] = false
+            callback(opt)
+        end)
+    end
+
+    valBtn.MouseButton1Click:Connect(function()
+        open[1] = not open[1]
+        if open[1] then
+            -- Posisi absolut valBtn relatif ke mainFrame
+            local absPos = valBtn.AbsolutePosition
+            local framePos = mainFrame.AbsolutePosition
+            local rx = absPos.X - framePos.X
+            local ry = absPos.Y - framePos.Y + valBtn.AbsoluteSize.Y + 4
+            dropMenu.Position = UDim2.new(0, rx, 0, ry)
+            dropMenu.Parent = mainFrame
+            dropMenu.Visible = true
+        else
+            dropMenu.Visible = false
+            dropMenu.Parent = nil
+        end
+    end)
+
+    return bg, 36
+end
+
+-- ============================================================
+-- GUI BUILD
+-- ============================================================
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LuluFishV4"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = guiParent
+
+-- Lotus button
+local lotusBtn = Instance.new("TextButton")
+lotusBtn.Size = UDim2.new(0, 56, 0, 56)
+lotusBtn.Position = UDim2.new(0.04, 0, 0.75, 0)
+lotusBtn.Text = "🌸"
+lotusBtn.TextSize = 32
+lotusBtn.BackgroundTransparency = 1
+lotusBtn.BorderSizePixel = 0
+lotusBtn.Parent = screenGui
+
+-- Info overlay (kanan atas)
+local infoPanel = Instance.new("Frame")
+infoPanel.Size = UDim2.new(0, 160, 0, 88)
+infoPanel.Position = UDim2.new(1, -170, 0, 10)
+infoPanel.BackgroundColor3 = Color3.fromRGB(15, 20, 35)
+infoPanel.BackgroundTransparency = 0.25
+infoPanel.BorderSizePixel = 0
+infoPanel.Visible = ShowInfo
+infoPanel.Parent = screenGui
+mkCorner(infoPanel, 10)
+
+local function mkInfoLine(text, yOff)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -10, 0, 18)
+    l.Position = UDim2.new(0, 6, 0, yOff)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = 11
+    l.TextColor3 = Color3.fromRGB(200, 220, 255)
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextTruncate = Enum.TextTruncate.AtEnd
+    l.Parent = infoPanel
+    return l
+end
+
+local infoLbl_Bill = mkInfoLine("Bill : —", 6)
+local infoLbl_Sum  = mkInfoLine("Sum  : —", 24)
+local infoLbl_Av   = mkInfoLine("Av   : —", 42)
+local infoLbl_Us   = mkInfoLine("Us   : —", 60)
+
+-- Update info setiap 0.5 detik
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not infoPanel or not infoPanel.Parent then break end
+        if infoPanel.Visible then
+            local prefix = GetBoardPrefix()
+            infoLbl_Bill.Text = "Bill : " .. (prefix or "—")
+
+            local avCount = 0
+            if prefix and #prefix > 0 then
+                local lp = string.lower(prefix)
+                local fl = string.upper(string.sub(prefix,1,1))
+                local bucket = KATA_INDEX[fl] or {}
+                for _, w in ipairs(bucket) do
+                    if string.sub(w,1,#lp) == lp and not UsedWords[w] and not SavedWords[w] then
+                        avCount = avCount + 1
+                    end
+                end
+            end
+            infoLbl_Av.Text  = "Av   : " .. avCount
+
+            local usCount = TotalUsed
+            infoLbl_Us.Text  = "Us   : " .. usCount
+
+            if currentWordLabel then
+                local cur = currentWordLabel.Text:gsub("📝 ",""):gsub("⏳.*","—"):gsub("⏸.*","—")
+                infoLbl_Sum.Text = "Sum  : " .. cur
+            end
+        end
+    end
+end)
+
+-- Main frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 460, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -230, 0.5, -200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+mkCorner(mainFrame, 16)
+
+-- Shadow
+local shadowFrame = Instance.new("Frame")
+shadowFrame.Size = UDim2.new(1, 20, 1, 20)
+shadowFrame.Position = UDim2.new(0, -10, 0, -10)
+shadowFrame.BackgroundColor3 = Color3.fromRGB(20, 90, 200)
+shadowFrame.BackgroundTransparency = 0.88
+shadowFrame.BorderSizePixel = 0
+shadowFrame.ZIndex = 0
+shadowFrame.Parent = mainFrame
+mkCorner(shadowFrame, 18)
+
+-- Title bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 48)
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 110, 240)
+titleBar.BorderSizePixel = 0
+titleBar.ZIndex = 2
+titleBar.Parent = mainFrame
+mkCorner(titleBar, 16)
+
+local tbGrad = Instance.new("UIGradient", titleBar)
+tbGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 120, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 90, 220)),
+}
+tbGrad.Rotation = 45
+
+-- Fix round corners on bottom of titlebar
+local titleFix = Instance.new("Frame")
+titleFix.Size = UDim2.new(1, 0, 0, 16)
+titleFix.Position = UDim2.new(0, 0, 1, -16)
+titleFix.BackgroundColor3 = Color3.fromRGB(30, 110, 240)
+titleFix.BorderSizePixel = 0
+titleFix.ZIndex = 1
+titleFix.Parent = titleBar
+local tfGrad = Instance.new("UIGradient", titleFix)
+tfGrad.Color = tbGrad.Color
+tfGrad.Rotation = 45
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -100, 1, 0)
+titleLabel.Position = UDim2.new(0, 16, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "🌸 LuluFish V4 – Kosa Kata Indo"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 17
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.ZIndex = 3
+titleLabel.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 36, 0, 36)
+closeBtn.Position = UDim2.new(1, -44, 0, 6)
+closeBtn.Text = "×"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 26
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+closeBtn.BackgroundTransparency = 0.1
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.BorderSizePixel = 0
+closeBtn.ZIndex = 3
+closeBtn.Parent = titleBar
+mkCorner(closeBtn, 8)
+makeHover(closeBtn, Color3.fromRGB(255,80,80), Color3.fromRGB(255,110,110))
+
+-- Left panel (sidebar menu)
+local leftPanel = Instance.new("Frame")
+leftPanel.Size = UDim2.new(0, 120, 1, -48)
+leftPanel.Position = UDim2.new(0, 0, 0, 48)
+leftPanel.BackgroundColor3 = Color3.fromRGB(245, 248, 255)
+leftPanel.BorderSizePixel = 0
+leftPanel.Parent = mainFrame
+
+-- Right panel (content)
+local rightPanel = Instance.new("Frame")
+rightPanel.Size = UDim2.new(1, -120, 1, -48)
+rightPanel.Position = UDim2.new(0, 120, 0, 48)
+rightPanel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+rightPanel.BorderSizePixel = 0
+rightPanel.ClipsDescendants = false
+rightPanel.Parent = mainFrame
+
+local container = Instance.new("ScrollingFrame")
+container.Size = UDim2.new(1, -16, 1, -16)
+container.Position = UDim2.new(0, 8, 0, 8)
+container.BackgroundTransparency = 1
+container.BorderSizePixel = 0
+container.ScrollBarThickness = 5
+container.ScrollBarImageColor3 = Color3.fromRGB(30, 110, 240)
+container.CanvasSize = UDim2.new(0, 0, 0, 0)
+container.Parent = rightPanel
+
+-- ============================================================
+-- SIDEBAR MENU BUTTONS
+-- ============================================================
+local function mkMenuBtn(text, yOff)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -12, 0, 38)
+    b.Position = UDim2.new(0, 6, 0, yOff)
+    b.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+    b.BackgroundTransparency = 1
+    b.Text = text
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 12
+    b.TextColor3 = Color3.fromRGB(80, 90, 120)
+    b.BorderSizePixel = 0
+    b.Parent = leftPanel
+    mkCorner(b, 8)
+    makeHover(b, Color3.fromRGB(245,248,255), Color3.fromRGB(220,230,255))
+    return b
+end
+
+local mainMenuBtn = mkMenuBtn("⚙️ Main",     8)
+local miscMenuBtn = mkMenuBtn("🔧 Misc",    54)
+local settMenuBtn = mkMenuBtn("🎯 Settings",100)
+
+local function setActiveMenu(btn)
+    for _, b in ipairs({mainMenuBtn, miscMenuBtn, settMenuBtn}) do
+        b.BackgroundTransparency = 1
+        b.TextColor3 = Color3.fromRGB(80, 90, 120)
+    end
+    btn.BackgroundTransparency = 0
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+-- ============================================================
+-- CLEAR CONTAINER
+-- ============================================================
+local function clearContainer()
+    for _, c in ipairs(container:GetChildren()) do
+        c:Destroy()
+    end
+end
+
+-- ============================================================
+-- BUILD MAIN TAB
+-- ============================================================
+local function buildMainUI()
+    clearContainer()
+    local y = 12
+
+    mkLabel(container, "Mode Auto", y, 20, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 24
+
+    -- Mode selector: 3 tombol horizontal
+    local MODES = {"Normal", "Mid", "Brutal"}
+    local modeButtons = {}
+    local modeBg = Instance.new("Frame")
+    modeBg.Size = UDim2.new(1, -16, 0, 36)
+    modeBg.Position = UDim2.new(0, 8, 0, y)
+    modeBg.BackgroundColor3 = Color3.fromRGB(235, 238, 248)
+    modeBg.BorderSizePixel = 0
+    modeBg.Parent = container
+    mkCorner(modeBg, 8)
+
+    local COL_ON  = Color3.fromRGB(40, 180, 80)
+    local COL_OFF = Color3.fromRGB(160, 165, 180)
+    local btnW = math.floor((1/#MODES) * 100)
+
+    local function refreshModeButtons()
+        for _, info in ipairs(modeButtons) do
+            local isActive = (info.mode == SelectedMode)
+            TweenService:Create(info.btn, TweenInfo.new(0.15), {
+                BackgroundColor3 = isActive and COL_ON or COL_OFF
+            }):Play()
+        end
+    end
+
+    for i, modeName in ipairs(MODES) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1/#MODES, i < #MODES and -2 or 0, 1, -6)
+        btn.Position = UDim2.new((i-1)/#MODES, i == 1 and 3 or 1, 0, 3)
+        btn.BackgroundColor3 = (modeName == SelectedMode) and COL_ON or COL_OFF
+        btn.Text = modeName
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 12
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.BorderSizePixel = 0
+        btn.Parent = modeBg
+        mkCorner(btn, 6)
+        table.insert(modeButtons, {btn = btn, mode = modeName})
+
+        btn.MouseButton1Click:Connect(function()
+            SelectedMode = modeName
+            refreshModeButtons()
+        end)
+    end
+    y = y + 46
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- ===== SETTINGS =====
+    mkLabel(container, "Settings", y, 20, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 24
+
+    -- Helper: number input row
+    local function mkNumberInput(labelText, yOff, defaultVal, step, minVal, maxVal, onChange)
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, -16, 0, 36)
+        bg.Position = UDim2.new(0, 8, 0, yOff)
+        bg.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
+        bg.BorderSizePixel = 0
+        bg.Parent = container
+        mkCorner(bg, 8)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.55, 0, 1, 0)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = labelText
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextColor3 = Color3.fromRGB(40, 50, 70)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = bg
+
+        local minusBtn = Instance.new("TextButton")
+        minusBtn.Size = UDim2.new(0, 26, 0, 26)
+        minusBtn.Position = UDim2.new(1, -110, 0.5, -13)
+        minusBtn.Text = "−"
+        minusBtn.Font = Enum.Font.GothamBold
+        minusBtn.TextSize = 16
+        minusBtn.BackgroundColor3 = Color3.fromRGB(200, 210, 230)
+        minusBtn.TextColor3 = Color3.fromRGB(40, 50, 70)
+        minusBtn.BorderSizePixel = 0
+        minusBtn.Parent = bg
+        mkCorner(minusBtn, 6)
+
+        local valLabel = Instance.new("TextLabel")
+        valLabel.Size = UDim2.new(0, 46, 0, 26)
+        valLabel.Position = UDim2.new(1, -80, 0.5, -13)
+        valLabel.BackgroundTransparency = 1
+        valLabel.Text = tostring(defaultVal)
+        valLabel.Font = Enum.Font.GothamBold
+        valLabel.TextSize = 13
+        valLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
+        valLabel.TextXAlignment = Enum.TextXAlignment.Center
+        valLabel.Parent = bg
+
+        local plusBtn = Instance.new("TextButton")
+        plusBtn.Size = UDim2.new(0, 26, 0, 26)
+        plusBtn.Position = UDim2.new(1, -30, 0.5, -13)
+        plusBtn.Text = "+"
+        plusBtn.Font = Enum.Font.GothamBold
+        plusBtn.TextSize = 16
+        plusBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+        plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        plusBtn.BorderSizePixel = 0
+        plusBtn.Parent = bg
+        mkCorner(plusBtn, 6)
+
+        local cur = {defaultVal}
+        local function update(v)
+            v = math.clamp(math.floor(v / step + 0.5) * step, minVal, maxVal)
+            v = math.floor(v * 100 + 0.5) / 100
+            cur[1] = v
+            valLabel.Text = tostring(v)
+            onChange(v)
+        end
+
+        minusBtn.MouseButton1Click:Connect(function() update(cur[1] - step) end)
+        plusBtn.MouseButton1Click:Connect(function()  update(cur[1] + step) end)
+        return bg
+    end
+
+    mkNumberInput("Delay (board muncul)", y, CFG.Delay, 0.1, 0, 3, function(v)
+        CFG.Delay = v
+    end)
+    y = y + 44
+
+    mkNumberInput("Speed (per karakter)", y, CFG.Speed, 0.05, 0.01, 1, function(v)
+        CFG.Speed = v
+    end)
+    y = y + 44
+
+    mkNumberInput("Fire Speed (antar kata)", y, CFG.FireSpeed, 0.1, 0.1, 5, function(v)
+        CFG.FireSpeed = v
+    end)
+    y = y + 44
+
+    mkNumberInput("Retry Delay (gagal)", y, CFG.RetryDelay, 0.5, 0.5, 10, function(v)
+        CFG.RetryDelay = v
+    end)
+    y = y + 44
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Start toggle
+    local startToggle
+    startToggle = mkToggle(container, "Start Auto", y, false, function(on)
+        if on then StartAuto() else StopAuto() end
+    end)
+    y = y + 46
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Current word display
+    mkLabel(container, "Kata saat ini:", y, 18, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 22
+
+    local wordBox = Instance.new("Frame")
+    wordBox.Size = UDim2.new(1, -16, 0, 38)
+    wordBox.Position = UDim2.new(0, 8, 0, y)
+    wordBox.BackgroundColor3 = Color3.fromRGB(240, 244, 255)
+    wordBox.BorderSizePixel = 0
+    wordBox.Parent = container
+    mkCorner(wordBox, 8)
+
+    local wordLbl = Instance.new("TextLabel")
+    wordLbl.Size = UDim2.new(1, -12, 1, 0)
+    wordLbl.Position = UDim2.new(0, 6, 0, 0)
+    wordLbl.BackgroundTransparency = 1
+    wordLbl.Text = "⏳ Belum jalan..."
+    wordLbl.Font = Enum.Font.GothamBold
+    wordLbl.TextSize = 13
+    wordLbl.TextColor3 = Color3.fromRGB(40, 120, 255)
+    wordLbl.TextXAlignment = Enum.TextXAlignment.Left
+    wordLbl.Parent = wordBox
+    currentWordLabel = wordLbl
+    y = y + 48
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Status kata loaded
+    local statusLbl = mkLabel(container, "⏳ Memuat kosa kata...", y, 20, 11, false, Color3.fromRGB(130,140,160))
+    y = y + 28
+
+    container.CanvasSize = UDim2.new(0, 0, 0, y)
+
+    -- trigger load
+    LoadKata(statusLbl)
+end
+
+-- ============================================================
+-- BUILD MISC TAB
+-- ============================================================
+local function buildMiscUI()
+    clearContainer()
+    local y = 12
+
+    mkLabel(container, "Player Detection", y, 20, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 24
+
+    mkToggle(container, "Auto Detect Player", y, AutoDetect, function(v)
+        AutoDetect = v
+    end)
+    y = y + 46
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Manual username input
+    mkLabel(container, "Username Manual", y, 18, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 22
+
+    local inputBox = Instance.new("TextBox")
+    inputBox.Size = UDim2.new(1, -16, 0, 34)
+    inputBox.Position = UDim2.new(0, 8, 0, y)
+    inputBox.BackgroundColor3 = Color3.fromRGB(240, 244, 255)
+    inputBox.Text = Username
+    inputBox.PlaceholderText = "Masukkan username..."
+    inputBox.Font = Enum.Font.Gotham
+    inputBox.TextSize = 13
+    inputBox.TextColor3 = Color3.fromRGB(40, 50, 70)
+    inputBox.PlaceholderColor3 = Color3.fromRGB(160, 170, 190)
+    inputBox.BorderSizePixel = 0
+    inputBox.ClearTextOnFocus = false
+    inputBox.Parent = container
+    mkCorner(inputBox, 8)
+
+    inputBox.FocusLost:Connect(function()
+        Username = inputBox.Text
+    end)
+    y = y + 44
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Info overlay toggle
+    mkLabel(container, "Info Overlay", y, 20, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 24
+
+    mkToggle(container, "Show Info (kanan atas)", y, ShowInfo, function(v)
+        ShowInfo = v
+        if infoPanel then infoPanel.Visible = v end
+    end)
+    y = y + 46
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Reset saved words
+    mkLabel(container, "Data", y, 18, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 22
+
+    local resetBtn = mkBtn(container, "🗑 Reset Saved Words", y, 38, Color3.fromRGB(220, 70, 70))
+    makeHover(resetBtn, Color3.fromRGB(220,70,70), Color3.fromRGB(240,100,100))
+    y = y + 48
+
+    local notifLbl = mkLabel(container, "", y, 20, 11, false, Color3.fromRGB(50,180,80))
+    y = y + 28
+
+    resetBtn.MouseButton1Click:Connect(function()
+        SavedWords = {}
+        UsedWords  = {}
+        notifLbl.Text = "✅ Saved words direset!"
+        task.delay(3, function()
+            if notifLbl and notifLbl.Parent then
+                notifLbl.Text = ""
+            end
+        end)
+    end)
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Info
+    local infoLbl = mkLabel(container, "LuluFish V4 | Kosa Kata Indo", y, 18, 10, false, Color3.fromRGB(160,170,185))
+    infoLbl.TextXAlignment = Enum.TextXAlignment.Center
+    infoLbl.Size = UDim2.new(1, -16, 0, 18)
+    y = y + 22
+
+    container.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+-- ============================================================
+-- BUILD SETTINGS TAB
+-- ============================================================
+local function buildSettingsUI()
+    clearContainer()
+    local y = 12
+
+    mkLabel(container, "Counter Akhiran", y, 20, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 24
+
+    -- Input suffix
+    mkLabel(container, "Input Akhiran", y, 18, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 22
+
+    local inputBg = Instance.new("Frame")
+    inputBg.Size = UDim2.new(1, -16, 0, 38)
+    inputBg.Position = UDim2.new(0, 8, 0, y)
+    inputBg.BackgroundColor3 = Color3.fromRGB(240, 244, 255)
+    inputBg.BorderSizePixel = 0
+    inputBg.Parent = container
+    mkCorner(inputBg, 8)
+
+    local inputBox = Instance.new("TextBox")
+    inputBox.Size = UDim2.new(1, -16, 1, -8)
+    inputBox.Position = UDim2.new(0, 8, 0, 4)
+    inputBox.BackgroundTransparency = 1
+    inputBox.Text = CounterSuffix
+    inputBox.PlaceholderText = "Contoh: T"
+    inputBox.Font = Enum.Font.GothamBold
+    inputBox.TextSize = 18
+    inputBox.TextColor3 = Color3.fromRGB(40, 120, 255)
+    inputBox.PlaceholderColor3 = Color3.fromRGB(160, 170, 190)
+    inputBox.BorderSizePixel = 0
+    inputBox.ClearTextOnFocus = false
+    inputBox.TextXAlignment = Enum.TextXAlignment.Center
+    inputBox.Parent = inputBg
+
+    inputBox.FocusLost:Connect(function()
+        -- Hanya ambil 1 huruf pertama
+        local val = inputBox.Text:match("^%s*(%a)") or ""
+        CounterSuffix = string.lower(val)
+        inputBox.Text = string.upper(CounterSuffix)
+    end)
+    y = y + 48
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Toggle Counter
+    mkToggle(container, "Counter", y, CounterOn, function(v)
+        CounterOn = v
+    end)
+    y = y + 46
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Penjelasan
+    local desc1 = mkLabel(container,
+        "Counter ON: pilih kata yang berakhiran",
+        y, 18, 11, false, Color3.fromRGB(130,140,160))
+    y = y + 20
+    local desc2 = mkLabel(container,
+        "huruf yang diinput. Fallback ke kata",
+        y, 18, 11, false, Color3.fromRGB(130,140,160))
+    y = y + 20
+    local desc3 = mkLabel(container,
+        "biasa kalau tidak ada yang cocok.",
+        y, 18, 11, false, Color3.fromRGB(130,140,160))
+    y = y + 28
+
+    container.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+-- ============================================================
+-- MENU SWITCH
+-- ============================================================
+mainMenuBtn.MouseButton1Click:Connect(function()
+    setActiveMenu(mainMenuBtn)
+    buildMainUI()
+end)
+
+miscMenuBtn.MouseButton1Click:Connect(function()
+    setActiveMenu(miscMenuBtn)
+    buildMiscUI()
+end)
+
+settMenuBtn.MouseButton1Click:Connect(function()
+    setActiveMenu(settMenuBtn)
+    buildSettingsUI()
+end)
+
+-- ============================================================
+-- DRAG
+-- ============================================================
+local function makeDraggable(frame, handle)
+    local dragging, dragStart, startPos
+    handle.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            dragStart = inp.Position
+            startPos  = frame.Position
+            inp.Changed:Connect(function()
+                if inp.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
+        or inp.UserInputType == Enum.UserInputType.Touch) then
+            local d = inp.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
+end
+
+makeDraggable(mainFrame, titleBar)
+makeDraggable(lotusBtn,  lotusBtn)
+
+-- ============================================================
+-- RESIZE
+-- ============================================================
+local resizeHandle = Instance.new("Frame")
+resizeHandle.Size = UDim2.new(0, 18, 0, 18)
+resizeHandle.AnchorPoint = Vector2.new(1, 1)
+resizeHandle.Position = UDim2.new(1, -4, 1, -4)
+resizeHandle.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+resizeHandle.BackgroundTransparency = 0.4
+resizeHandle.BorderSizePixel = 0
+resizeHandle.Parent = mainFrame
+mkCorner(resizeHandle, 5)
+
+local resizing, initSz, resSt
+resizeHandle.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1
+    or inp.UserInputType == Enum.UserInputType.Touch then
+        resizing = true
+        initSz = mainFrame.Size
+        resSt  = inp.Position
+        inp.Changed:Connect(function()
+            if inp.UserInputState == Enum.UserInputState.End then resizing = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+    if resizing and (inp.UserInputType == Enum.UserInputType.MouseMovement
+    or inp.UserInputType == Enum.UserInputType.Touch) then
+        local d = inp.Position - resSt
+        mainFrame.Size = UDim2.new(
+            0, math.clamp(initSz.X.Offset + d.X, 380, 800),
+            0, math.clamp(initSz.Y.Offset + d.Y, 300, 650)
+        )
+    end
+end)
+
+-- ============================================================
+-- CLOSE / LOTUS
+-- ============================================================
+local normalSize = mainFrame.Size
+
+closeBtn.MouseButton1Click:Connect(function()
+    StopAuto()
+    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+        {Size = UDim2.new(0, 0, 0, 0)}):Play()
+    task.wait(0.3)
+    screenGui:Destroy()
+end)
+
+lotusBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+    if mainFrame.Visible then
+        mainFrame.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {Size = normalSize}):Play()
+    end
+    TweenService:Create(lotusBtn, TweenInfo.new(0.3), {Rotation = lotusBtn.Rotation + 180}):Play()
+end)
+
+-- ============================================================
+-- INIT
+-- ============================================================
+setActiveMenu(mainMenuBtn)
+buildMainUI()
+
+task.wait(0.5)
+lotusBtn.Rotation = -180
+TweenService:Create(lotusBtn, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Rotation = 0}):Play()
+
+print("🌸 LuluFish V4 Kosa Kata Indo - Loaded!")
+print("⚙️ Main | 🔧 Misc")
