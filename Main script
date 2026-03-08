@@ -24,10 +24,12 @@ local AutoTask     = nil
 local AutoDetect   = true
 local SavedWords   = {}
 local UsedWords    = {}
-local TotalUsed    = 0     -- counter kumulatif kata yang sudah dipakai
+local TotalUsed    = 0
 local ShowInfo     = true
 local CounterOn    = false
-local CounterSuffix = ""   -- huruf akhiran yang diinginkan
+local CounterSuffix = ""
+local CurrentBill  = "—"   -- prefix board dari game (disimpan sebelum fire)
+local CurrentSum   = "—"   -- kata terakhir yang disubmit
 
 -- ============================================================
 -- SETTINGS
@@ -222,6 +224,8 @@ local function StartAuto()
                 end
                 local word = FindWord(prefix)
                 if word then
+                    CurrentBill = prefix
+                    CurrentSum  = word
                     if currentWordLabel then
                         currentWordLabel.Text = "📝 " .. word
                     end
@@ -232,14 +236,29 @@ local function StartAuto()
                     else
                         PlayRisk(word)
                     end
-                    task.wait(CFG.FireSpeed)
 
-                    -- Cek gagal
-                    local afterPrefix = GetBoardPrefix()
-                    if afterPrefix and afterPrefix == lastPrefix and IsRunning then
+                    -- Cek sukses/gagal: tunggu 0.5s lalu cek 2x
+                    local failed = false
+                    for check = 1, 2 do
+                        task.wait(0.5)
+                        local boardNow = GetBoardPrefix()
+                        if boardNow then
+                            -- Board masih ada setelah cek ke-2 = gagal pasti
+                            if check == 2 then
+                                failed = true
+                            end
+                            -- Cek 1 masih ada, lanjut ke cek 2
+                        else
+                            -- Board hilang = sukses, stop cek
+                            break
+                        end
+                    end
+
+                    if failed then
                         if currentWordLabel then
                             currentWordLabel.Text = "❌ Gagal, retry..."
                         end
+                        -- Reset billboard ke prefix awal
                         pcall(function()
                             ReplicatedStorage.Remotes.BillboardUpdate:FireServer(lastPrefix)
                         end)
@@ -550,29 +569,23 @@ task.spawn(function()
         task.wait(0.5)
         if not infoPanel or not infoPanel.Parent then break end
         if infoPanel.Visible then
-            local prefix = GetBoardPrefix()
-            infoLbl_Bill.Text = "Bill : " .. (prefix or "—")
+            infoLbl_Bill.Text = "Bill : " .. CurrentBill
+
+            infoLbl_Sum.Text  = "Sum  : " .. CurrentSum
 
             local avCount = 0
-            if prefix and #prefix > 0 then
-                local lp = string.lower(prefix)
-                local fl = string.upper(string.sub(prefix,1,1))
+            if CurrentBill ~= "—" then
+                local lp = string.lower(CurrentBill)
+                local fl = string.upper(string.sub(CurrentBill, 1, 1))
                 local bucket = KATA_INDEX[fl] or {}
                 for _, w in ipairs(bucket) do
-                    if string.sub(w,1,#lp) == lp and not UsedWords[w] and not SavedWords[w] then
+                    if string.sub(w, 1, #lp) == lp and not UsedWords[w] and not SavedWords[w] then
                         avCount = avCount + 1
                     end
                 end
             end
             infoLbl_Av.Text  = "Av   : " .. avCount
-
-            local usCount = TotalUsed
-            infoLbl_Us.Text  = "Us   : " .. usCount
-
-            if currentWordLabel then
-                local cur = currentWordLabel.Text:gsub("📝 ",""):gsub("⏳.*","—"):gsub("⏸.*","—")
-                infoLbl_Sum.Text = "Sum  : " .. cur
-            end
+            infoLbl_Us.Text  = "Us   : " .. TotalUsed
         end
     end
 end)
@@ -997,8 +1010,11 @@ local function buildMiscUI()
     y = y + 28
 
     resetBtn.MouseButton1Click:Connect(function()
-        SavedWords = {}
-        UsedWords  = {}
+        SavedWords  = {}
+        UsedWords   = {}
+        TotalUsed   = 0
+        CurrentBill = "—"
+        CurrentSum  = "—"
         notifLbl.Text = "✅ Saved words direset!"
         task.delay(3, function()
             if notifLbl and notifLbl.Parent then
