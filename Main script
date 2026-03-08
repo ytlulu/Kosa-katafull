@@ -42,7 +42,7 @@ local CFG = {
 -- ============================================================
 -- LOAD KOSA KATA
 -- ============================================================
-local KATA_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/main/kosakata_KBBI.txt"
+local KATA_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/main/for20%update.txt"
 local KOSA_KATA = {}
 local KATA_INDEX= {}
 
