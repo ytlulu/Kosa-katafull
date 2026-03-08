@@ -1,5 +1,5 @@
 -- ============================================================
---   LuluFish V4 | Map: Kosa Kata Indo
+--   LuluFish V5 | Map: Kosa Kata Indo
 --   UI Manual (No Library)
 -- ============================================================
 
@@ -58,6 +58,13 @@ local function BuildIndex()
 end
 
 local function LoadKata(statusLabel)
+    if not KATA_URL or KATA_URL == "" then
+        if statusLabel then
+            statusLabel.Text = "📭 Kosa kata kosong"
+            statusLabel.TextColor3 = Color3.fromRGB(180, 130, 50)
+        end
+        return
+    end
     task.spawn(function()
         task.wait(0.3)
         if statusLabel then statusLabel.Text = "⏳ Memuat kosa kata..." end
@@ -178,8 +185,14 @@ end
 local function PlayNormal(word, startFrom)
     if not word then return end
     task.wait(CFG.Delay)
-    -- startFrom = panjang prefix yang sudah ada di billboard, mulai dari situ
     local from = startFrom or 0
+    -- Clear dulu kalau from = 0 (tidak ada prefix), hindari sisa teks sebelumnya
+    if from == 0 then
+        pcall(function()
+            ReplicatedStorage.Remotes.BillboardUpdate:FireServer("")
+        end)
+        task.wait(0.05)
+    end
     for i = from + 1, #word do
         if not IsRunning then return end
         local partial = string.sub(word, 1, i)
@@ -267,6 +280,13 @@ local function StartAuto()
                         TotalUsed = math.max(0, TotalUsed - 1)
                     end
                     continue
+                else
+                    -- Tidak ada kata di kosa kata untuk prefix ini
+                    CurrentBill = prefix
+                    if currentWordLabel then
+                        currentWordLabel.Text = "⚠️ Input manual"
+                        currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
+                    end
                 end
             else
                 lastPrefix = nil
@@ -645,7 +665,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -100, 1, 0)
 titleLabel.Position = UDim2.new(0, 16, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🌸 LuluFish V4 – Kosa Kata Indo"
+titleLabel.Text = "🌸 LuluFish V5 – Kosa Kata Indo"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 17
@@ -902,7 +922,7 @@ local function buildMainUI()
     mkDivider(container, y)
     y = y + 12
 
-    -- Current word display
+    -- Sum: display kata + input manual kalau tidak ada di kosa kata
     mkLabel(container, "Kata saat ini:", y, 18, 11, false, Color3.fromRGB(100,110,140))
     y = y + 22
 
@@ -1027,7 +1047,7 @@ local function buildMiscUI()
     y = y + 12
 
     -- Info
-    local infoLbl = mkLabel(container, "LuluFish V4 | Kosa Kata Indo", y, 18, 10, false, Color3.fromRGB(160,170,185))
+    local infoLbl = mkLabel(container, "LuluFish V5 | Kosa Kata Indo", y, 18, 10, false, Color3.fromRGB(160,170,185))
     infoLbl.TextXAlignment = Enum.TextXAlignment.Center
     infoLbl.Size = UDim2.new(1, -16, 0, 18)
     y = y + 22
@@ -1227,5 +1247,5 @@ task.wait(0.5)
 lotusBtn.Rotation = -180
 TweenService:Create(lotusBtn, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Rotation = 0}):Play()
 
-print("🌸 LuluFish V4 Kosa Kata Indo - Loaded!")
+print("🌸 LuluFish V5 Kosa Kata Indo - Loaded!")
 print("⚙️ Main | 🔧 Misc")
