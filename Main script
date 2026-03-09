@@ -251,63 +251,57 @@ local function StartAuto()
                         PlayRisk(prefix, word)
                     end
 
-                    -- Cek sukses/gagal: 1x cek setelah 0.8s
+                    -- Cek sukses/gagal setelah submit
                     task.wait(0.8)
-                    local boardNow = GetBoardPrefix()
-                    local failed = (boardNow ~= nil)
 
-                    if failed then
-                        SavedWords[word] = nil
-                        UsedWords[word]  = true
-                        TotalUsed = math.max(0, TotalUsed - 1)
+                    -- Retry loop: ulangi terus selama prefix sama & masih running
+                    local retryWord = word
+                    while IsRunning do
+                        local boardNow = GetBoardPrefix()
+                        if boardNow == nil then break end  -- sukses, board hilang
 
-                        -- Log kata gagal ke cekkosakata.json
+                        -- Gagal: board masih ada dengan prefix sama
+                        if boardNow ~= originalPrefix then break end  -- giliran berubah, stop
+
+                        -- Log ke cekfail.json (simple append)
                         pcall(function()
-                            local FAIL_URL = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/cekkosakata.json"
-                            local existing = {}
-                            local ok2, raw = pcall(function() return game:HttpGet(FAIL_URL, true) end)
-                            if ok2 and raw and raw ~= "" then
-                                local parsed = pcall(function()
-                                    existing = game:GetService("HttpService"):JSONDecode(raw)
-                                end)
+                            if writefile then
+                                local ok2, raw = pcall(readfile, "cekfail.txt")
+                                local content = (ok2 and raw) and raw or ""
+                                writefile("cekfail.txt", content .. retryWord .. "\n")
                             end
-                            -- Tambah kata gagal kalau belum ada
-                            local alreadyIn = false
-                            for _, v in ipairs(existing) do
-                                if v == word then alreadyIn = true break end
-                            end
-                            if not alreadyIn then
-                                table.insert(existing, word)
-                                -- Tulis ke file lokal (writefile jika tersedia di exploit)
-                                if writefile then
-                                    writefile("cekkosakata.json",
-                                        game:GetService("HttpService"):JSONEncode(existing))
-                                end
-                                warn("⚠️ Kata gagal fire: " .. word)
-                            end
+                            warn("❌ Fail: " .. retryWord)
                         end)
 
-                        -- Retry pakai originalPrefix (bukan board sekarang yang sudah berubah)
-                        local retry = FindWord(originalPrefix)
-                        if retry then
-                            CurrentSum = retry
-                            if currentWordLabel then
-                                currentWordLabel.Text = "🔄 " .. retry
-                                currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
-                            end
-                            if SelectedMode == "Normal" then
-                                PlayNormal(originalPrefix, retry)
-                            elseif SelectedMode == "Mid" then
-                                PlayMid(originalPrefix, retry)
-                            else
-                                PlayRisk(originalPrefix, retry)
-                            end
-                        else
+                        SavedWords[retryWord] = nil
+                        UsedWords[retryWord]  = true
+                        TotalUsed = math.max(0, TotalUsed - 1)
+
+                        -- Cari kata berikutnya
+                        local next = FindWord(originalPrefix)
+                        if not next then
                             if currentWordLabel then
                                 currentWordLabel.Text = "⚠️ Kata habis"
                                 currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
                             end
+                            break
                         end
+
+                        retryWord  = next
+                        CurrentSum = next
+                        if currentWordLabel then
+                            currentWordLabel.Text = "🔄 " .. next
+                            currentWordLabel.TextColor3 = Color3.fromRGB(255, 160, 30)
+                        end
+
+                        if SelectedMode == "Normal" then
+                            PlayNormal(originalPrefix, next)
+                        elseif SelectedMode == "Mid" then
+                            PlayMid(originalPrefix, next)
+                        else
+                            PlayRisk(originalPrefix, next)
+                        end
+                        task.wait(0.8)
                     end
                     continue
                 else
