@@ -261,6 +261,32 @@ local function StartAuto()
                         UsedWords[word]  = true
                         TotalUsed = math.max(0, TotalUsed - 1)
 
+                        -- Log kata gagal ke cekkosakata.json
+                        pcall(function()
+                            local FAIL_URL = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/cekkosakata.json"
+                            local existing = {}
+                            local ok2, raw = pcall(function() return game:HttpGet(FAIL_URL, true) end)
+                            if ok2 and raw and raw ~= "" then
+                                local parsed = pcall(function()
+                                    existing = game:GetService("HttpService"):JSONDecode(raw)
+                                end)
+                            end
+                            -- Tambah kata gagal kalau belum ada
+                            local alreadyIn = false
+                            for _, v in ipairs(existing) do
+                                if v == word then alreadyIn = true break end
+                            end
+                            if not alreadyIn then
+                                table.insert(existing, word)
+                                -- Tulis ke file lokal (writefile jika tersedia di exploit)
+                                if writefile then
+                                    writefile("cekkosakata.json",
+                                        game:GetService("HttpService"):JSONEncode(existing))
+                                end
+                                warn("⚠️ Kata gagal fire: " .. word)
+                            end
+                        end)
+
                         -- Retry pakai originalPrefix (bukan board sekarang yang sudah berubah)
                         local retry = FindWord(originalPrefix)
                         if retry then
@@ -967,44 +993,6 @@ end
 local function buildMiscUI()
     clearContainer()
     local y = 12
-
-    mkLabel(container, "Player Detection", y, 20, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 24
-
-    mkToggle(container, "Auto Detect Player", y, AutoDetect, function(v)
-        AutoDetect = v
-    end)
-    y = y + 46
-
-    mkDivider(container, y)
-    y = y + 12
-
-    -- Manual username input
-    mkLabel(container, "Username Manual", y, 18, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 22
-
-    local inputBox = Instance.new("TextBox")
-    inputBox.Size = UDim2.new(1, -16, 0, 34)
-    inputBox.Position = UDim2.new(0, 8, 0, y)
-    inputBox.BackgroundColor3 = Color3.fromRGB(240, 244, 255)
-    inputBox.Text = Username
-    inputBox.PlaceholderText = "Masukkan username..."
-    inputBox.Font = Enum.Font.Gotham
-    inputBox.TextSize = 13
-    inputBox.TextColor3 = Color3.fromRGB(40, 50, 70)
-    inputBox.PlaceholderColor3 = Color3.fromRGB(160, 170, 190)
-    inputBox.BorderSizePixel = 0
-    inputBox.ClearTextOnFocus = false
-    inputBox.Parent = container
-    mkCorner(inputBox, 8)
-
-    inputBox.FocusLost:Connect(function()
-        Username = inputBox.Text
-    end)
-    y = y + 44
-
-    mkDivider(container, y)
-    y = y + 12
 
     -- Info overlay toggle
     mkLabel(container, "Info Overlay", y, 20, 11, false, Color3.fromRGB(100,110,140))
