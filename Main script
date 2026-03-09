@@ -1,5 +1,5 @@
 -- ============================================================
---   LuluFish V5 | Map: Kosa Kata Indo
+--   LuluV V5 | Map: Kosa Kata Indo
 --   UI Manual (No Library)
 -- ============================================================
 
@@ -43,7 +43,7 @@ local CFG = {
 -- ============================================================
 -- LOAD KOSA KATA
 -- ============================================================
-local KATA_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/main/for%20update.txt"
+local KATA_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/NEXTKATA.txt"
 local KOSA_KATA = {}
 local KATA_INDEX= {}
 
@@ -174,43 +174,48 @@ local function FindWord(prefix)
     return picked
 end
 
-local function Submit(word)
+local function Submit(bill, sum)
+    -- sisa = bagian sum setelah bill
+    local sisa = string.sub(sum, #bill + 1)
     pcall(function()
-        ReplicatedStorage.Remotes.SubmitWord:FireServer(word)
+        ReplicatedStorage.Remotes.SubmitWord:FireServer(sisa)
     end)
-    SavedWords[word] = true
+    SavedWords[sum] = true
     TotalUsed = TotalUsed + 1
 end
 
-local function PlayNormal(word)
+local function PlayNormal(bill, word)
     if not word then return end
     task.wait(CFG.Delay)
-    for i = 1, #word do
+    -- sisa = huruf setelah bill
+    local sisa = string.sub(word, #bill + 1)
+    for i = 1, #sisa do
         if not IsRunning then return end
-        local partial = string.sub(word, 1, i)
+        local partial = string.sub(sisa, 1, i)
         pcall(function()
             ReplicatedStorage.Remotes.BillboardUpdate:FireServer(partial)
         end)
         task.wait(CFG.Speed)
     end
     task.wait(0.1)
-    Submit(word)
+    Submit(bill, word)
 end
 
-local function PlayMid(word)
+local function PlayMid(bill, word)
     if not word then return end
     task.wait(CFG.Delay)
+    local sisa = string.sub(word, #bill + 1)
     pcall(function()
-        ReplicatedStorage.Remotes.BillboardUpdate:FireServer(word)
+        ReplicatedStorage.Remotes.BillboardUpdate:FireServer(sisa)
     end)
     task.wait(0.2)
-    Submit(word)
+    Submit(bill, word)
 end
 
-local function PlayRisk(word)
+local function PlayRisk(bill, word)
     if not word then return end
     task.wait(CFG.Delay)
-    Submit(word)
+    Submit(bill, word)
 end
 
 local currentWordLabel = nil  -- diisi setelah GUI dibuat
@@ -231,63 +236,45 @@ local function StartAuto()
                 if word then
                     CurrentBill = prefix
                     CurrentSum  = word
+                    -- Simpan prefix asli sebelum fire (board bisa berubah setelah submit)
+                    local originalPrefix = prefix
                     if currentWordLabel then
                         currentWordLabel.Text = "📝 " .. word
                         currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
                     end
 
-                    -- Manual mode: tampilkan kata di Sum, tidak auto fire
-                    -- User ketik sendiri, tap Sum untuk ganti kata
-                    if SelectedMode == "Manual" then
-                        -- Tunggu sampai mode berubah atau prefix berubah
-                        while IsRunning and SelectedMode == "Manual" and GetBoardPrefix() == prefix do
-                            task.wait(0.3)
-                        end
-                        continue
-                    end
-
                     if SelectedMode == "Normal" then
-                        PlayNormal(word)
+                        PlayNormal(prefix, word)
                     elseif SelectedMode == "Mid" then
-                        PlayMid(word)
+                        PlayMid(prefix, word)
                     else
-                        PlayRisk(word)
+                        PlayRisk(prefix, word)
                     end
 
-                    -- Cek sukses/gagal: tunggu 0.5s lalu cek 2x
-                    local failed = false
-                    for check = 1, 2 do
-                        task.wait(0.5)
-                        local boardNow = GetBoardPrefix()
-                        if boardNow then
-                            if check == 2 then
-                                failed = true
-                            end
-                        else
-                            break
-                        end
-                    end
+                    -- Cek sukses/gagal: 1x cek setelah 0.8s
+                    task.wait(0.8)
+                    local boardNow = GetBoardPrefix()
+                    local failed = (boardNow ~= nil)
 
                     if failed then
                         SavedWords[word] = nil
                         UsedWords[word]  = true
                         TotalUsed = math.max(0, TotalUsed - 1)
 
-                        -- Cari kata lain, update billboard langsung (belum fire)
-                        local retry = FindWord(lastPrefix)
+                        -- Retry pakai originalPrefix (bukan board sekarang yang sudah berubah)
+                        local retry = FindWord(originalPrefix)
                         if retry then
                             CurrentSum = retry
                             if currentWordLabel then
                                 currentWordLabel.Text = "🔄 " .. retry
                                 currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
                             end
-                            -- Update billboard ke kata baru (belum submit)
                             if SelectedMode == "Normal" then
-                                PlayNormal(retry)
+                                PlayNormal(originalPrefix, retry)
                             elseif SelectedMode == "Mid" then
-                                PlayMid(retry)
+                                PlayMid(originalPrefix, retry)
                             else
-                                PlayRisk(retry)
+                                PlayRisk(originalPrefix, retry)
                             end
                         else
                             if currentWordLabel then
@@ -298,7 +285,6 @@ local function StartAuto()
                     end
                     continue
                 else
-                    -- Tidak ada kata di kosa kata untuk prefix ini
                     CurrentBill = prefix
                     if currentWordLabel then
                         currentWordLabel.Text = "⚠️ Tidak ada kata"
@@ -324,7 +310,7 @@ local function StopAuto()
 end
 
 -- ============================================================
--- GUI HELPERS (style dari LuluFish V3)
+-- GUI HELPERS (style dari LuluV V3)
 -- ============================================================
 local function makeHover(btn, base, hov)
     btn.MouseEnter:Connect(function()
@@ -554,7 +540,7 @@ end
 -- ============================================================
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LuluFishV4"
+screenGui.Name = "LuluVV4"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = guiParent
@@ -682,7 +668,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -100, 1, 0)
 titleLabel.Position = UDim2.new(0, 16, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🌸 LuluFish V5 – Kosa Kata Indo"
+titleLabel.Text = "🌸 LuluV V5 – Kosa Kata Indo"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 17
@@ -785,7 +771,7 @@ local function buildMainUI()
     y = y + 24
 
     -- Mode selector: 4 tombol horizontal
-    local MODES = {"Normal", "Mid", "Brutal", "Manual"}
+    local MODES = {"Normal", "Mid", "Brutal"}
     local modeButtons = {}
     local modeBg = Instance.new("Frame")
     modeBg.Size = UDim2.new(1, -16, 0, 36)
@@ -957,21 +943,7 @@ local function buildMainUI()
     wordLbl.BorderSizePixel = 0
     wordLbl.Parent = wordBox
 
-    -- Tap Sum = ganti kata (hanya di Manual mode)
-    wordLbl.MouseButton1Click:Connect(function()
-        if SelectedMode ~= "Manual" then return end
-        local prefix = GetBoardPrefix()
-        if not prefix then return end
-        local next = FindWord(prefix)
-        if next then
-            CurrentSum = next
-            wordLbl.Text = "📝 " .. next
-            wordLbl.TextColor3 = Color3.fromRGB(40, 120, 255)
-        else
-            wordLbl.Text = "⚠️ Kata habis"
-            wordLbl.TextColor3 = Color3.fromRGB(220, 120, 30)
-        end
-    end)
+
 
     currentWordLabel = wordLbl
     y = y + 48
@@ -1076,7 +1048,7 @@ local function buildMiscUI()
     y = y + 12
 
     -- Info
-    local infoLbl = mkLabel(container, "LuluFish V5 | Kosa Kata Indo", y, 18, 10, false, Color3.fromRGB(160,170,185))
+    local infoLbl = mkLabel(container, "LuluV V5 | Kosa Kata Indo", y, 18, 10, false, Color3.fromRGB(160,170,185))
     infoLbl.TextXAlignment = Enum.TextXAlignment.Center
     infoLbl.Size = UDim2.new(1, -16, 0, 18)
     y = y + 22
@@ -1278,7 +1250,7 @@ lotusBtn.Rotation = -180
 TweenService:Create(lotusBtn, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Rotation = 0}):Play()
 
 print("================================")
-print("🌸 LuluFish V5 | Kosa Kata Indo")
+print("🌸 LuluV V5 | Kosa Kata Indo")
 print("================================")
 print("📋 Changelog:")
 print("mode update&Change")
