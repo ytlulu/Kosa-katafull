@@ -1,3 +1,142 @@
+scarlett
+bennett
+garnett
+barrett
+marrett
+emmett
+everett
+jarrett
+lovett
+hewett
+collett
+gillette
+paulett
+lynnett
+jeannett
+marcellitt
+harriett
+minett
+annett
+cournett
+brunett
+violett
+margarett
+jeanett
+lisett
+odett
+georgett
+henriett
+laurett
+rossett
+clementt
+janett
+arlett
+jolett
+monnett
+lovett
+benedett
+emmettt
+darnett
+murrett
+stannett
+trenett
+wynnett
+marlett
+barnett
+harlett
+class
+kiss
+boss
+glass
+pass
+stress
+address
+process
+success
+bell
+doll
+well
+spell
+small
+install
+thrill
+quarrell
+glenn
+ann
+joann
+johann
+brennan
+quinn
+finn
+lynn
+svenn
+capp
+slipp
+clipp
+flipp
+tapp
+mapp
+terror
+mirror
+horror
+sorrow
+barrier
+ferr
+starr
+barr
+programmm
+mamm
+comm
+swimm
+drumm
+summ
+flickk
+makk
+takk
+backk
+checkk
+clickk
+cliff
+sniff
+staff
+puff
+snuff
+riff
+scuff
+tramm
+kamm
+hamm
+finn
+jenn
+linn
+renn
+benn
+dunn
+wrenn
+grimm
+brimm
+skull
+thrill
+quell
+chill
+spill
+grill
+drill
+frill
+merrill
+darrell
+mitchell
+nichelle
+michelle
+isabell
+annabelle
+raphael
+raphaell
+raphaelle
+gabriell
+gabrielle
+axolotl
+scarlett
 limbah
 ganas
 hadeh
@@ -1127,4 +1266,1311 @@ ramadhan
 ikon
 ondel
 toleransi
-dew
+dewi
+yan
+Afghani
+Lek
+Dinar
+Euro
+Kwanza
+East Caribbean Dollar
+Peso
+Dram
+Australian Dollar
+Manat
+Bahamian Dollar
+Taka
+Barbados Dollar
+Belarusian Ruble
+Franc
+Birr
+Ruble
+Riel
+Yuan Renminbi
+Canadian Dollar
+Cabo Verde Escudo
+Cayman Islands Dollar
+Corona
+CFA Franc BEAC
+CFA Franc BCEAO
+Yen
+Ringgit
+Rupee
+New Zealand Dollar
+Sol
+Quetzal
+Gourde
+Lempira
+Forint
+Kuna
+Shilling
+Rufiyaa
+Krone
+Shekel
+Pataca
+Pa'anga
+Lek
+Cordoba
+Peso Uruguayo
+Dollar
+Ngultrum
+Tugrik
+Som
+Somoni
+Dobra
+Dalasi
+Riyal
+Rufiyaa
+Rand
+Dirham
+Pula
+Lek
+Dram
+Manat
+Kyat
+Rial
+Baht
+Lira
+Ouguiya
+Peso Convertible
+Guarani
+Rial Omani
+Peso Philippine
+Zloty
+Ruble Transnistria
+New Taiwan Dollar
+Baht
+Dong
+Lilangeni
+Dollar US
+Dollar Singapore
+Dinar Jordan
+Shilling Tanzania
+Shilling Uganda
+Shilling Kenya
+Shilling Somalia
+Shilling Somaliland
+Dinar Iraqi
+Dinar Kuwaiti
+Dinar Libyan
+Dinar Bahraini
+Dinar Algerian
+Angklung
+Gamelan
+Sasando
+Kolintang
+Gendang
+Gong
+Rebana
+Saluang
+Kecapi
+Siter
+Tifa
+Gambang
+Kendang
+Bonang
+Saluang Minang
+Serune Kale
+Gambang Kromong
+Cengceng
+Kenong
+Suling
+Kompang
+Gendang Betawi
+Tanjidor
+Calung
+Aramba
+Talempong
+Gendang Melayu
+Kacapi Sunda
+Sasando Rote
+Alat Musik Tradisional Bali
+Gamelan Bali
+Gamelan Jawa
+Gamelan Sunda
+Kendang Sunda
+Gong Jawa
+Bawang merah
+Bawangmerah
+Bawang putih
+Bawangputih
+Cabe merah
+Cabemerah
+Cabe rawit
+Caberawit
+Jahe
+Kunyit
+Lengkuas
+Serai
+Daun salam
+DaunSalam
+Daun jeruk
+DaunJeruk
+Kemiri
+Ketumbar
+Meja
+Kursi
+Lemari
+Tempat tidur
+TempatTidur
+Sofa
+Sofa bed
+SofaBed
+Rak
+Rak buku
+RakBuku
+Kipas angin
+KipasAngin
+Lampu
+Lampu meja
+LampuMeja
+Televisi
+Televisi LED
+TelevisiLED
+Kulkas
+Kulkas mini
+KulkasMini
+Kompor
+Kompor gas
+KomporGas
+Oven
+Oven listrik
+OvenListrik
+Rice cooker
+RiceCooker
+Blender
+Blender tangan
+BlenderTangan
+Setrika
+Setrika uap
+SetrikaUap
+Microwave
+Microwave oven
+MicrowaveOven
+Vacuum cleaner
+VacuumCleaner
+Jam dinding
+JamDinding
+Gorden
+Gorden jendela
+GordenJendela
+Karpet
+Karpet bulu
+KarpetBulu
+Cermin
+Cermin besar
+CerminBesar
+Meja belajar
+MejaBelajar
+Rak sepatu
+RakSepatu
+Botol air
+BotolAir
+Panci
+Panci presto
+PanciPresto
+Wajan
+Wajan anti lengket
+WajanAntiLengket
+Sendok
+Sendok makan
+SendokMakan
+Garpu
+Garpu stainless
+GarpuStainless
+Pisau
+Pisau dapur
+PisauDapur
+Talenan
+Talenan kayu
+TalenanKayu
+Gelas
+Gelas kaca
+GelasKaca
+Piring
+Piring makan
+PiringMakan
+Mangkok
+Mangkok keramik
+MangkokKeramik
+<think>
+Thinking Process:
+
+1.  **Analyze the Request:**
+    *   Input: A large list of words (previously provided in the conversation history, but now the user is asking to process *that* list again with specific filters).
+    *   Filters:
+        1.  Remove spam words (e.g., "tdaaaaaa", "axsssssssss", "immmmmmm", "axtidakkkkkkkkkkkkkkkkk", etc.). Basically, words with excessive repeated characters or obvious gibberish.
+        2.  Remove words containing the character `#`.
+        3.  Output format: One word per line ("1 kata 1 baris").
+        4.  Output style: "Kata\nKata\nKata" (This likely means just the words, one per line, as per the previous instruction interpretation, but the user now says "Buat dalam kode/file.txt" which implies they want the content ready for a file, but since I'm a text AI, I'll provide the text block).
+        5.  The user specifically said "Kata\nKata\nKata" in the previous turn, but now says "1 kata 1 baris gitu". I should output just the cleaned words, one per line.
+    *   Goal: Clean the word list from the previous turn based on the new criteria.
+
+2.  **Review the Input Data (from previous turn):**
+    *   I need to go through the list I generated in the previous turn (or the original input) and apply the filters.
+    *   Filters to apply:
+        *   Remove words with `#` (e.g., `g###`, `x####`, `pe###`, `ng#####`, `k#####`, `j#####`, `sa###`, `l####`, `if######`, `axpe`? No, `axpe` is okay, `axsssssssss` is spam).
+        *   Remove spam (excessive repetition like `axsssssssss`, `immmmmmm`, `axtidakkkkkkkkkkkkkkkkk`, `ybertemantapi`? Maybe, `aakujugamausholat`? Maybe. `tdaaaaaa` example given).
+        *   Keep standard words.
+
+3.  **Define "Spam" and "Hashtag":**
+    *   **Hashtag:** Any word containing `#`.
+    *   **Spam:** Words with excessive repeated letters (e.g., `aaaaa`, `xxxxx`, `kkkkk`) that look like typos or noise, not standard words.
+        *   Examples from input: `axsssssssss`, `immmmmmm`, `axtidakkkkkkkkkkkkkkkkk`, `ybertemantapi` (looks like a typo/concatenation), `aakujugamausholat` (looks like a typo/concatenation).
+        *   Standard words with repeated letters (e.g., `bini`, `data`, `sains`, `mala`? No `malam`) should be kept.
+        *   I need to be careful not to remove valid words that happen to have repeated letters (e.g., `buku`, `susu`, `makan`, `katak`).
+        *   The example `tdaaaaaa` suggests removing words ending in many 'a's or having long runs of the same character.
+        *   I will remove words with 4+ consecutive identical characters (e.g., `ssss`, `mmmm`, `kkkk`).
+        *   I will remove words containing `#`.
+
+4.  **Process the List:**
+    *   I will iterate through the words extracted in the previous turn (or reconstruct from the original input blocks) and filter them.
+    *   I need to make sure I don't miss any valid words.
+    *   I will output the result as plain text, one word per line.
+
+5.  **Refining the Spam Filter:**
+    *   Rule 1: Contains `#` -> Delete.
+    *   Rule 2: Contains 4 or more consecutive identical characters (e.g., `aaaa`, `xxxx`, `mmmm`) -> Delete.
+    *   Rule 3: Looks like a concatenation of sentences without spaces (e.g., `aakujugamausholat`, `ybertemantapi`) -> Delete. (Heuristic: Length > 15 and no common word boundaries? Or just follow the `tdaaaaaa` example which implies gibberish).
+    *   Let's stick to the explicit instructions: "Hapus yang spam(cth: tdaaaaaaa)" and "Hapus yang ada #".
+    *   So, `axsssssssss` (has `ssssssss`) -> Delete.
+    *   `immmmmmm` (has `mmmmmm`) -> Delete.
+    *   `axtidakkkkkkkkkkkkkkkkk` (has `kkkkkkkkkkkkkkkk`) -> Delete.
+    *   `g###`, `x####`, `pe###`, `ng#####`, `k#####`, `j#####`, `sa###`, `l####`, `if######` -> Delete (contains `#`).
+    *   `ybertemantapi` -> This looks like spam/typo. I'll delete it.
+    *   `aakujugamausholat` -> This looks like spam/typo. I'll delete it.
+    *   `axpe` -> Keep (no `#`, no excessive repetition).
+    *   `axkd` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axsssssssss` -> Delete.
+    *   `axtidakkkkkkkkkkkkkkkkk` -> Delete.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `axolotl` -> Keep.
+    *   `axkd` -> Keep.
+    *   `axecelsum` -> Keep.
+    *   `axpe` -> Keep.
+    *   `ax......
+</think>nang
+sinaps
+liks
+ngebut
+psikolog
+oga
+bini
+galer
+alaestesia
+kota
+eru
+ziarat
+rupsi
+otaknya
+hem
+atensi
+singkir
+simpleks
+kiranya
+abang
+utusan
+yahwe
+angk
+wejangan
+guar
+eks
+anggotanya
+arek
+nyanyi
+abarumbung
+nyit
+silikon
+ngadat
+data
+ola
+apik
+solat
+lampiran
+tabia
+representatif
+micin
+rumahan
+fatah
+dalih
+ahwal
+tahiyat
+alu
+axecelsum
+luang
+maks
+jamu
+ngeh
+salix
+atit
+ilmiah
+titisan
+heng
+laga
+alkana
+agak
+akademia
+nano
+sangkakala
+gayang
+obeng
+alangkah
+angah
+mampu
+hamd
+gahi
+doa
+ilusif
+ingatlah
+apifobia
+ngukur
+floribundua
+hannah
+hang
+gawe
+xenoglosofobia
+kalimantan
+ngarang
+entiti
+tangis
+istos
+toso
+ekang
+neni
+gisi
+angklung
+sotoraks
+isilop
+ilok
+ksa
+lopis
+afiks
+ungkang
+pisa
+ding
+angkat
+xn
+top
+farmasi
+bat
+ngunsi
+adda
+iklas
+migrain
+aut
+utamakan
+nul
+sintetis
+adil
+univ
+ulasan
+dila
+nadah
+hil
+akurat
+t
+kisah
+alami
+dalil
+minum
+xeromorf
+cilor
+numi
+kursor
+doni
+loron
+ingkari
+donax
+nit
+uban
+cicak
+iffah
+nite
+terus
+duri
+heteronormatif
+kujang
+urip
+tompel
+kuantitatif
+konpas
+jik
+telek
+fenome
+ripuh
+warna
+milyar
+xilograf
+kualitatif
+tuh
+lampau
+afta
+efektif
+ustad
+anik
+urea
+dasar
+solutif
+budha
+kundang
+kelang
+lion
+ifkontitemg
+adaptif
+soa
+ngalir
+ukhti
+ajar
+ans
+ansa
+baru
+sains
+instan
+tans
+misa
+oxo
+rincian
+ireks
+famali
+istim
+urutan
+imang
+tensi
+ksad
+abajang
+sindiran
+ngon
+paok
+kabang
+oksidasi
+angsuran
+axolotl
+ninggal
+asis
+urs
+duk
+emang
+iftith
+ituu
+taif
+gocek
+qataa
+jesus
+anjap
+fasa
+gersang
+sabuk
+surya
+nias
+kirai
+siul
+aih
+lilin
+unggah
+ihaka
+tri
+duren
+sihi
+mika
+ring
+nego
+oro
+apel
+sanjun
+kartika
+akamsi
+ungar
+munta
+singapura
+tah
+ngais
+radioaktif
+angkot
+tana
+naha
+ambarawa
+sunda
+akibat
+wahana
+tahlil
+tio
+responsi
+ionosfer
+ndagk
+respons
+spo
+resesi
+sungai
+rompi
+spons
+rintih
+kusut
+natri
+eke
+iblisologisa
+sutil
+tasyakuran
+tilu
+kelek
+kon
+antagonis
+aqua
+tikam
+ihik
+antisipasi
+reo
+simpanan
+anekdot
+kulum
+kapal
+wadah
+ahit
+tumpangan
+iring
+tamak
+narator
+exp
+akpol
+axpe
+nino
+maki
+polisi
+keong
+sampaikan
+ngs
+gor
+oxt
+semende
+budi
+disini
+extr
+buih
+paruh
+and
+darah
+ngepal
+ngambek
+ake
+gizi
+tempe
+palang
+kelok
+angkusa
+ihram
+kumuh
+mitra
+ruh
+raih
+sapur
+kont
+ilat
+adam
+ip
+kek
+angi
+iris
+rimbang
+korang
+ging
+santun
+exe
+rok
+intensif
+koki
+ex
+wang
+cici
+airi
+cilok
+bakar
+injektif
+kiat
+ritme
+karang
+amak
+ating
+fisioterapi
+ajudan
+dana
+anang
+akas
+sulut
+kasik
+lalu
+trek
+luap
+putih
+bilik
+iku
+kalak
+nampol
+akomodasi
+tolong
+teka
+lonjong
+akik
+ekar
+usi
+ifom
+ikip
+resik
+kipas
+sikatan
+lipa
+tang
+ngisen
+pahi
+seng
+enggak
+gibah
+osmosis
+huni
+sol
+ngorek
+gakua
+pina
+lace
+rekor
+masjid
+orisinal
+kontrak
+kosi
+idola
+osin
+amik
+akumulatif
+kurs
+uit
+lontong
+isolatif
+rangkap
+flu
+ganjar
+futung
+fas
+ple
+undip
+sas
+vokatif
+map
+udahan
+jiran
+pr
+proton
+lelah
+opor
+antaran
+santaksantin
+ranah
+tinggal
+rol
+tono
+rang
+landak
+katup
+automotif
+hul
+geometris
+onot
+ahlian
+kelar
+alatif
+embah
+lirik
+fakir
+hirup
+roh
+upaya
+rusi
+tungau
+teknik
+oh
+rugi
+gaura
+gatal
+siklus
+revolusi
+taring
+helo
+ginjal
+kutak
+hasrat
+ngi
+alteratif
+alm
+akhir
+tif
+tahta
+ruan
+anaglif
+nimbun
+akomodatif
+lift
+tinjau
+jaur
+vila
+ruang
+yal
+aplikatif
+pundak
+luar
+uterus
+kalung
+kuti
+tampil
+ngilan
+gaku
+gil
+lanjut
+tikus
+sintesis
+lagian
+ikea
+ifumi
+lalak
+nus
+laku
+mis
+nant
+isla
+misterius
+kulit
+ampar
+laju
+kolak
+kompor
+nipon
+wayang
+akang
+ambal
+neo
+sayu
+una
+lahat
+asri
+ember
+erups
+bis
+keli
+anjin
+gurita
+erang
+isai
+ija
+gedug
+alsi
+ugm
+teler
+xerografi
+hutan
+engal
+rop
+antariksa
+ksatria
+ane
+lin
+sanggan
+erep
+panjang
+pent
+nen
+geo
+tilas
+amsa
+lasi
+olok
+empu
+ngab
+kece
+siput
+bit
+nenim
+tini
+bitu
+cerai
+nini
+paha
+naas
+sop
+lumbung
+imbalan
+hun
+pipis
+pangsit
+akong
+anjur
+xerokopi
+alat
+imas
+latah
+umbi
+bisu
+ahmak
+kamar
+ahab
+qris
+subjek
+nitrogen
+ipor
+hantar
+islah
+refleksif
+super
+bagus
+fatal
+nove
+haid
+sugih
+limitatif
+sorot
+ifut
+tumit
+taro
+ideologi
+knalpot
+tips
+aroma
+mao
+psikis
+fut
+tolak
+gacor
+omay
+knu
+danang
+akal
+lain
+tahu
+ambar
+unggul
+humpi
+les
+gulang
+insan
+fun
+ganten
+uink
+impostor
+ngengat
+anka
+angkutan
+sih
+cuka
+ngelap
+tiup
+puisi
+ayung
+kaya
+isilah
+sihli
+online
+singa
+lakah
+harmonis
+agung
+haikal
+amar
+xerosis
+erupsi
+tuma
+gurah
+regional
+rajuk
+jukut
+inter
+rekening
+tasik
+ompreng
+sangkar
+mudah
+gara
+helm
+halaman
+ngeluh
+rapi
+dimana
+guling
+hutang
+gi
+rapuh
+september
+ksl
+aduh
+uhus
+riau
+uranus
+xenn
+simpul
+almar
+ngikut
+salju
+juma
+nagih
+laser
+ruam
+ngutan
+geno
+impor
+be
+amer
+gob
+ngilang
+eon
+rebon
+ne
+kampang
+suni
+insang
+hape
+intes
+ingat
+ngadu
+era
+pempek
+atasan
+ars
+kang
+sandi
+gaun
+diam
+opini
+kuma
+neka
+oxl
+kilat
+alkitab
+amunisi
+atma
+ciu
+bukit
+nahkoda
+stip
+gading
+arif
+tipu
+ngigau
+apterix
+ipuk
+iklim
+xenokrasi
+indikator
+giung
+pukan
+markas
+nganjuk
+torong
+kere
+rebus
+iako
+ngajar
+xilena
+jari
+karung
+irian
+tib
+ann
+yang
+sabda
+nggak
+dahi
+embe
+tin
+kurma
+rudal
+istri
+manggis
+ninox
+mantul
+adiktif
+ulam
+hira
+maya
+jatuh
+axkd
+aframax
+rahim
+falk
+hud
+enon
+udik
+ons
+vital
+ser
+ere
+liur
+malah
+dikat
+elek
+katro
+troli
+eksa
+malam
+oktober
+salim
+sihir
+goso
+bintang
+mula
+raun
+galai
+angkut
+unduh
+mai
+ks
+intens
+otong
+gotong
+ap
+ikal
+ngotot
+yam
+zamrud
+luas
+sayang
+ilas
+dugong
+asoy
+ayun
+dompet
+soya
+rekrut
+ira
+bioenergy
+andong
+konci
+kepompong
+tasi
+kuis
+usik
+habitat
+silam
+mulu
+acuan
+hipochondria
+riak
+cinta
+ngupin
+arau
+utuh
+tarzan
+apit
+fabel
+belum
+jauh
+dirut
+utara
+uht
+gakan
+ngop
+tuman
+pilang
+tiktok
+alim
+gua
+akualung
+milik
+imajinasi
+sikut
+utir
+uar
+ungkap
+riba
+oksigen
+pal
+vas
+sudirman
+sad
+kano
+risol
+sadis
+bandung
+uud
+samping
+alus
+oya
+ngisi
+ngerti
+oleng
+disi
+tilam
+gelo
+istana
+kimak
+geopolitik
+haik
+nampak
+organisasi
+iti
+op
+anas
+lahi
+aikim
+dua
+disetujui
+uin
+hidrogen
+sipu
+engku
+hima
+scar
+wanita
+lape
+majas
+quis
+ven
+enter
+run
+riuh
+monster
+mundur
+resa
+fakta
+sare
+kerumah
+oyoa
+xenia
+resat
+tindik
+butuh
+rempah
+lafa
+bebek
+afair
+hafiz
+uha
+garpu
+eo
+puasa
+airo
+ronggok
+gokil
+maling
+kilau
+z
+gabas
+basi
+autograf
+iatrofobia
+fallop
+tumbuk
+bianglala
+afirmasi
+buta
+lab
+labu
+asimilasi
+abuh
+kirang
+buhan
+sinterklas
+anabelfobia
+biasa
+asabiyah
+excellency
+nazar
+golek
+hailai
+laik
+leks
+cyen
+ofensif
+fai
+sim
+nabatah
+imbang
+ngarai
+loid
+kontrol
+faiv
+don
+horror
+fiaj
+aau
+deduktif
+ingatan
+tase
+hia
+iambus
+semahal
+akti
+expecten
+alabangka
+fam
+motif
+haye
+rakit
+sifat
+cina
+fata
+ayem
+ataksia
+ta
+telepat
+faka
+ambisi
+alad
+kausatif
+ladu
+imsak
+unama
+adapti
+amatir
+aktual
+akrab
+alab
+taraf
+baik
+ab
+isalohipse
+iktidal
+aft
+uk
+psem
+panti
+pil
+ngocok
+malaysia
+pilu
+hongkon
