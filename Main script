@@ -43,9 +43,13 @@ local CFG = {
 -- ============================================================
 -- LOAD KOSA KATA
 -- ============================================================
-local KATA_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/NEXTKATA.txt"
-local KOSA_KATA = {}
-local KATA_INDEX= {}
+local KATA_URL    = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/NEXTKATA.txt"
+local FRENLY_URL  = ""https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/for%20update.txt"  -- isi URL raw frenlytext di sini
+local KOSA_KATA   = {}
+local KATA_INDEX  = {}
+local FRENLY_KATA  = {}
+local FRENLY_INDEX = {}
+local PriorityFrenly = false
 
 local function BuildIndex()
     KATA_INDEX = {}
@@ -54,6 +58,53 @@ local function BuildIndex()
         if not KATA_INDEX[first] then KATA_INDEX[first] = {} end
         table.insert(KATA_INDEX[first], word)
     end
+end
+
+local function BuildFrenlyIndex()
+    FRENLY_INDEX = {}
+    for _, word in ipairs(FRENLY_KATA) do
+        local first = string.upper(string.sub(word, 1, 1))
+        if not FRENLY_INDEX[first] then FRENLY_INDEX[first] = {} end
+        table.insert(FRENLY_INDEX[first], word)
+    end
+end
+
+local function LoadFrenly(statusLabel)
+    if not FRENLY_URL or FRENLY_URL == "" then
+        if statusLabel then
+            statusLabel.Text = "📭 Frenly URL kosong"
+            statusLabel.TextColor3 = Color3.fromRGB(180, 130, 50)
+        end
+        return
+    end
+    task.spawn(function()
+        if statusLabel then statusLabel.Text = "⏳ Memuat frenly..." end
+        local ok, result = pcall(function()
+            return game:HttpGet(FRENLY_URL, true)
+        end)
+        if not ok or not result then
+            if statusLabel then statusLabel.Text = "❌ Gagal load frenly!" end
+            return
+        end
+        FRENLY_KATA = {}
+        local seen = {}
+        for line in result:gmatch("[^\n]+") do
+            local word = line:match("^%s*(.-)%s*$")
+            if word and #word >= 2 then
+                local w = string.lower(word)
+                if not seen[w] then
+                    seen[w] = true
+                    table.insert(FRENLY_KATA, w)
+                end
+            end
+        end
+        BuildFrenlyIndex()
+        print("✅ Loaded frenly:", #FRENLY_KATA)
+        if statusLabel then
+            statusLabel.Text = "✅ " .. #FRENLY_KATA .. " frenly dimuat"
+            statusLabel.TextColor3 = Color3.fromRGB(50, 180, 80)
+        end
+    end)
 end
 
 local function LoadKata(statusLabel)
@@ -142,32 +193,44 @@ local function FindWord(prefix)
     if not prefix or #prefix == 0 then return nil end
     local lowerPrefix = string.lower(prefix)
     local firstLetter = string.upper(string.sub(prefix, 1, 1))
-    local candidates = KATA_INDEX[firstLetter] or {}
 
-    local available = {}
-    for _, word in ipairs(candidates) do
-        if string.sub(word, 1, #lowerPrefix) == lowerPrefix
-            and not UsedWords[word] and not SavedWords[word] then
-            -- Filter suffix kalau Counter ON
-            if CounterOn and CounterSuffix ~= "" then
-                local suffix = string.lower(CounterSuffix)
-                local wordEnd = string.sub(word, -#suffix)
-                if wordEnd ~= suffix then
-                    continue
-                end
-            end
-            table.insert(available, word)
-        end
-    end
-    -- Fallback: kalau tidak ada kata yang match suffix, cari tanpa filter suffix
-    if #available == 0 and CounterOn and CounterSuffix ~= "" then
+    local function searchIn(index)
+        local candidates = index[firstLetter] or {}
+        local available = {}
         for _, word in ipairs(candidates) do
             if string.sub(word, 1, #lowerPrefix) == lowerPrefix
                 and not UsedWords[word] and not SavedWords[word] then
+                if CounterOn and CounterSuffix ~= "" then
+                    local suffix = string.lower(CounterSuffix)
+                    if string.sub(word, -#suffix) ~= suffix then continue end
+                end
                 table.insert(available, word)
             end
         end
+        -- Fallback suffix
+        if #available == 0 and CounterOn and CounterSuffix ~= "" then
+            for _, word in ipairs(candidates) do
+                if string.sub(word, 1, #lowerPrefix) == lowerPrefix
+                    and not UsedWords[word] and not SavedWords[word] then
+                    table.insert(available, word)
+                end
+            end
+        end
+        return available
     end
+
+    -- Priority frenly dulu kalau ON
+    if PriorityFrenly and #FRENLY_KATA > 0 then
+        local frenlyAvail = searchIn(FRENLY_INDEX)
+        if #frenlyAvail > 0 then
+            local picked = frenlyAvail[math.random(#frenlyAvail)]
+            UsedWords[picked] = true
+            return picked
+        end
+    end
+
+    -- Fallback ke KOSA_KATA biasa
+    local available = searchIn(KATA_INDEX)
     if #available == 0 then return nil end
     local picked = available[math.random(#available)]
     UsedWords[picked] = true
@@ -224,98 +287,113 @@ local function StartAuto()
     if IsRunning then return end
     IsRunning = true
     AutoTask = task.spawn(function()
-        local lastPrefix = nil
+        local lockedPrefix = nil  -- prefix yang sedang dikerjakan (locked)
         while IsRunning do
             local prefix = GetBoardPrefix()
-            if prefix then
-                if prefix ~= lastPrefix then
-                    lastPrefix = prefix
-                    UsedWords  = {}
+
+            -- Kalau board kosong, unlock
+            if not prefix then
+                lockedPrefix = nil
+                if currentWordLabel then currentWordLabel.Text = "⏳ Menunggu board..." end
+                task.wait(0.3)
+                continue
+            end
+
+            -- Lock prefix baru hanya kalau belum lock atau lock sebelumnya sudah selesai
+            if not lockedPrefix then
+                lockedPrefix = prefix
+                UsedWords = {}
+            end
+
+            -- Kalau board berubah tapi bukan karena kata kita (prefix baru beneran)
+            -- prefix baru = tidak diawali lockedPrefix (bukan sisa kata kita)
+            if prefix ~= lockedPrefix and not (prefix:sub(1, #lockedPrefix) == lockedPrefix) then
+                lockedPrefix = prefix
+                UsedWords = {}
+            end
+
+            CurrentBill = lockedPrefix
+            local word = FindWord(lockedPrefix)
+            if not word then
+                if currentWordLabel then
+                    currentWordLabel.Text = "⚠️ Tidak ada kata"
+                    currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
                 end
-                local word = FindWord(prefix)
-                if word then
-                    CurrentBill = prefix
-                    CurrentSum  = word
-                    -- Simpan prefix asli sebelum fire (board bisa berubah setelah submit)
-                    local originalPrefix = prefix
+                task.wait(0.3)
+                continue
+            end
+
+            CurrentSum = word
+            if currentWordLabel then
+                currentWordLabel.Text = "📝 " .. word
+                currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
+            end
+
+            if SelectedMode == "Normal" then
+                PlayNormal(lockedPrefix, word)
+            elseif SelectedMode == "Mid" then
+                PlayMid(lockedPrefix, word)
+            else
+                PlayRisk(lockedPrefix, word)
+            end
+
+            -- Retry loop: tunggu board hilang (sukses) atau kata habis
+            local retryWord = word
+            while IsRunning do
+                task.wait(0.8)
+                local boardNow = GetBoardPrefix()
+
+                -- Board hilang = sukses
+                if not boardNow then
+                    lockedPrefix = nil
+                    break
+                end
+
+                -- Board masih ada = gagal (apapun isinya, kita tetap pakai lockedPrefix)
+                -- Log cekfail
+                pcall(function()
+                    if writefile then
+                        local ok2, raw = pcall(readfile, "cekfail.txt")
+                        local content = (ok2 and raw) and raw or ""
+                        writefile("cekfail.txt", content .. retryWord .. "\n")
+                    end
+                    warn("❌ Fail: " .. retryWord)
+                end)
+
+                SavedWords[retryWord] = nil
+                UsedWords[retryWord]  = true
+                TotalUsed = math.max(0, TotalUsed - 1)
+
+                -- Cari kata berikutnya pakai lockedPrefix (bukan boardNow)
+                local next = FindWord(lockedPrefix)
+                if not next then
                     if currentWordLabel then
-                        currentWordLabel.Text = "📝 " .. word
-                        currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
-                    end
-
-                    if SelectedMode == "Normal" then
-                        PlayNormal(prefix, word)
-                    elseif SelectedMode == "Mid" then
-                        PlayMid(prefix, word)
-                    else
-                        PlayRisk(prefix, word)
-                    end
-
-                    -- Cek sukses/gagal setelah submit
-                    task.wait(0.8)
-
-                    -- Retry loop: ulangi terus selama prefix sama & masih running
-                    local retryWord = word
-                    while IsRunning do
-                        local boardNow = GetBoardPrefix()
-                        if boardNow == nil then break end  -- sukses, board hilang
-
-                        -- Gagal: board masih ada dengan prefix sama
-                        if boardNow ~= originalPrefix then break end  -- giliran berubah, stop
-
-                        -- Log ke cekfail.json (simple append)
-                        pcall(function()
-                            if writefile then
-                                local ok2, raw = pcall(readfile, "cekfail.txt")
-                                local content = (ok2 and raw) and raw or ""
-                                writefile("cekfail.txt", content .. retryWord .. "\n")
-                            end
-                            warn("❌ Fail: " .. retryWord)
-                        end)
-
-                        SavedWords[retryWord] = nil
-                        UsedWords[retryWord]  = true
-                        TotalUsed = math.max(0, TotalUsed - 1)
-
-                        -- Cari kata berikutnya
-                        local next = FindWord(originalPrefix)
-                        if not next then
-                            if currentWordLabel then
-                                currentWordLabel.Text = "⚠️ Kata habis"
-                                currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
-                            end
-                            break
-                        end
-
-                        retryWord  = next
-                        CurrentSum = next
-                        if currentWordLabel then
-                            currentWordLabel.Text = "🔄 " .. next
-                            currentWordLabel.TextColor3 = Color3.fromRGB(255, 160, 30)
-                        end
-
-                        if SelectedMode == "Normal" then
-                            PlayNormal(originalPrefix, next)
-                        elseif SelectedMode == "Mid" then
-                            PlayMid(originalPrefix, next)
-                        else
-                            PlayRisk(originalPrefix, next)
-                        end
-                        task.wait(0.8)
-                    end
-                    continue
-                else
-                    CurrentBill = prefix
-                    if currentWordLabel then
-                        currentWordLabel.Text = "⚠️ Tidak ada kata"
+                        currentWordLabel.Text = "⚠️ Kata habis"
                         currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
                     end
+                    -- Tunggu board hilang sendiri
+                    while IsRunning do
+                        task.wait(0.3)
+                        if not GetBoardPrefix() then lockedPrefix = nil break end
+                    end
+                    break
                 end
-            else
-                lastPrefix = nil
-                if currentWordLabel then currentWordLabel.Text = "⏳ Menunggu board..." end
+
+                retryWord  = next
+                CurrentSum = next
+                if currentWordLabel then
+                    currentWordLabel.Text = "🔄 " .. next
+                    currentWordLabel.TextColor3 = Color3.fromRGB(255, 160, 30)
+                end
+
+                if SelectedMode == "Normal" then
+                    PlayNormal(lockedPrefix, next)
+                elseif SelectedMode == "Mid" then
+                    PlayMid(lockedPrefix, next)
+                else
+                    PlayRisk(lockedPrefix, next)
+                end
             end
-            task.wait(0.3)
         end
         if currentWordLabel then currentWordLabel.Text = "⏸ Stopped" end
     end)
@@ -979,6 +1057,7 @@ local function buildMainUI()
 
     -- trigger load
     LoadKata(statusLbl)
+    LoadFrenly(nil)
 end
 
 -- ============================================================
@@ -1109,6 +1188,18 @@ local function buildSettingsUI()
         "biasa kalau tidak ada yang cocok.",
         y, 18, 11, false, Color3.fromRGB(130,140,160))
     y = y + 28
+
+    mkDivider(container, y)
+    y = y + 12
+
+    -- Priority Frenly
+    mkLabel(container, "Frenly Priority", y, 20, 11, false, Color3.fromRGB(100,110,140))
+    y = y + 24
+
+    mkToggle(container, "Priority Frenly Used", y, PriorityFrenly, function(v)
+        PriorityFrenly = v
+    end)
+    y = y + 46
 
     container.CanvasSize = UDim2.new(0, 0, 0, y)
 end
