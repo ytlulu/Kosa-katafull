@@ -1273,26 +1273,25 @@ Lek
 Dinar
 Euro
 Kwanza
-East Caribbean Dollar
+East Caribbean
 Peso
 Dram
-Australian Dollar
+Australian
 Manat
-Bahamian Dollar
+Bahamian
 Taka
-Barbados Dollar
-Belarusian Ruble
+Barbados
+Belarusian
 Franc
 Birr
 Ruble
 Riel
-Yuan Renminbi
-Canadian Dollar
-Cabo Verde Escudo
-Cayman Islands Dollar
+Yuan
+Canadian
+Cabo
+Cayman
 Corona
-CFA Franc BEAC
-CFA Franc BCEAO
+CFA
 Yen
 Ringgit
 Rupee
@@ -1308,7 +1307,7 @@ Rufiyaa
 Krone
 Shekel
 Pataca
-Pa'anga
+Panga
 Lek
 Cordoba
 Peso Uruguayo
@@ -1332,30 +1331,17 @@ Rial
 Baht
 Lira
 Ouguiya
-Peso Convertible
+Peso
 Guarani
-Rial Omani
-Peso Philippine
+Rial
+Peso
 Zloty
-Ruble Transnistria
-New Taiwan Dollar
+Ruble
 Baht
 Dong
 Lilangeni
-Dollar US
-Dollar Singapore
-Dinar Jordan
-Shilling Tanzania
-Shilling Uganda
-Shilling Kenya
-Shilling Somalia
-Shilling Somaliland
-Dinar Iraqi
-Dinar Kuwaiti
-Dinar Libyan
-Dinar Bahraini
-Dinar Algerian
-Angklung
+dollar
+Dinar 
 Gamelan
 Sasando
 Kolintang
@@ -1369,229 +1355,105 @@ Tifa
 Gambang
 Kendang
 Bonang
-Saluang Minang
-Serune Kale
-Gambang Kromong
+Saluang
+Serune
+Gambang
 Cengceng
 Kenong
 Suling
 Kompang
-Gendang Betawi
+Gendang
 Tanjidor
 Calung
 Aramba
 Talempong
-Gendang Melayu
-Kacapi Sunda
-Sasando Rote
-Alat Musik Tradisional Bali
-Gamelan Bali
-Gamelan Jawa
-Gamelan Sunda
-Kendang Sunda
-Gong Jawa
-Bawang merah
+Gendang
+Kacapi
+Sasando
+Bawang
+merah
 Bawangmerah
-Bawang putih
+Bawang
+putih
 Bawangputih
-Cabe merah
+Cabe
+merah
 Cabemerah
-Cabe rawit
 Caberawit
 Jahe
 Kunyit
 Lengkuas
 Serai
-Daun salam
-DaunSalam
-Daun jeruk
+salam
+jeruk
 DaunJeruk
 Kemiri
 Ketumbar
 Meja
 Kursi
 Lemari
-Tempat tidur
 TempatTidur
 Sofa
-Sofa bed
-SofaBed
 Rak
-Rak buku
+buku
 RakBuku
-Kipas angin
-KipasAngin
+Kipas
+angin
 Lampu
-Lampu meja
-LampuMeja
 Televisi
-Televisi LED
-TelevisiLED
+LED
 Kulkas
-Kulkas mini
 KulkasMini
 Kompor
-Kompor gas
 KomporGas
 Oven
-Oven listrik
 OvenListrik
-Rice cooker
 RiceCooker
 Blender
-Blender tangan
-BlenderTangan
 Setrika
-Setrika uap
 SetrikaUap
-Microwave
-Microwave oven
-MicrowaveOven
-Vacuum cleaner
-VacuumCleaner
-Jam dinding
+oven
+Vacuum
+Jam
+dinding
 JamDinding
 Gorden
-Gorden jendela
-GordenJendela
+Jendela
 Karpet
-Karpet bulu
-KarpetBulu
+Karpet
+bulu
 Cermin
-Cermin besar
-CerminBesar
-Meja belajar
-MejaBelajar
-Rak sepatu
+besar
+belajar
+Meja
 RakSepatu
-Botol air
-BotolAir
+Rak
+Botol
+Air
 Panci
-Panci presto
-PanciPresto
 Wajan
-Wajan anti lengket
-WajanAntiLengket
+Wajan
+anti
+lengket
 Sendok
-Sendok makan
-SendokMakan
 Garpu
-Garpu stainless
-GarpuStainless
+Garpu
+Stainless
 Pisau
-Pisau dapur
-PisauDapur
+dapur
 Talenan
-Talenan kayu
-TalenanKayu
+kayu
 Gelas
-Gelas kaca
-GelasKaca
+Kaca
 Piring
-Piring makan
-PiringMakan
+Makan
 Mangkok
-Mangkok keramik
-MangkokKeramik
-<think>
-Thinking Process:
-
-1.  **Analyze the Request:**
-    *   Input: A large list of words (previously provided in the conversation history, but now the user is asking to process *that* list again with specific filters).
-    *   Filters:
-        1.  Remove spam words (e.g., "tdaaaaaa", "axsssssssss", "immmmmmm", "axtidakkkkkkkkkkkkkkkkk", etc.). Basically, words with excessive repeated characters or obvious gibberish.
-        2.  Remove words containing the character `#`.
-        3.  Output format: One word per line ("1 kata 1 baris").
-        4.  Output style: "Kata\nKata\nKata" (This likely means just the words, one per line, as per the previous instruction interpretation, but the user now says "Buat dalam kode/file.txt" which implies they want the content ready for a file, but since I'm a text AI, I'll provide the text block).
-        5.  The user specifically said "Kata\nKata\nKata" in the previous turn, but now says "1 kata 1 baris gitu". I should output just the cleaned words, one per line.
-    *   Goal: Clean the word list from the previous turn based on the new criteria.
-
-2.  **Review the Input Data (from previous turn):**
-    *   I need to go through the list I generated in the previous turn (or the original input) and apply the filters.
-    *   Filters to apply:
-        *   Remove words with `#` (e.g., `g###`, `x####`, `pe###`, `ng#####`, `k#####`, `j#####`, `sa###`, `l####`, `if######`, `axpe`? No, `axpe` is okay, `axsssssssss` is spam).
-        *   Remove spam (excessive repetition like `axsssssssss`, `immmmmmm`, `axtidakkkkkkkkkkkkkkkkk`, `ybertemantapi`? Maybe, `aakujugamausholat`? Maybe. `tdaaaaaa` example given).
-        *   Keep standard words.
-
-3.  **Define "Spam" and "Hashtag":**
-    *   **Hashtag:** Any word containing `#`.
-    *   **Spam:** Words with excessive repeated letters (e.g., `aaaaa`, `xxxxx`, `kkkkk`) that look like typos or noise, not standard words.
-        *   Examples from input: `axsssssssss`, `immmmmmm`, `axtidakkkkkkkkkkkkkkkkk`, `ybertemantapi` (looks like a typo/concatenation), `aakujugamausholat` (looks like a typo/concatenation).
-        *   Standard words with repeated letters (e.g., `bini`, `data`, `sains`, `mala`? No `malam`) should be kept.
-        *   I need to be careful not to remove valid words that happen to have repeated letters (e.g., `buku`, `susu`, `makan`, `katak`).
-        *   The example `tdaaaaaa` suggests removing words ending in many 'a's or having long runs of the same character.
-        *   I will remove words with 4+ consecutive identical characters (e.g., `ssss`, `mmmm`, `kkkk`).
-        *   I will remove words containing `#`.
-
-4.  **Process the List:**
-    *   I will iterate through the words extracted in the previous turn (or reconstruct from the original input blocks) and filter them.
-    *   I need to make sure I don't miss any valid words.
-    *   I will output the result as plain text, one word per line.
-
-5.  **Refining the Spam Filter:**
-    *   Rule 1: Contains `#` -> Delete.
-    *   Rule 2: Contains 4 or more consecutive identical characters (e.g., `aaaa`, `xxxx`, `mmmm`) -> Delete.
-    *   Rule 3: Looks like a concatenation of sentences without spaces (e.g., `aakujugamausholat`, `ybertemantapi`) -> Delete. (Heuristic: Length > 15 and no common word boundaries? Or just follow the `tdaaaaaa` example which implies gibberish).
-    *   Let's stick to the explicit instructions: "Hapus yang spam(cth: tdaaaaaaa)" and "Hapus yang ada #".
-    *   So, `axsssssssss` (has `ssssssss`) -> Delete.
-    *   `immmmmmm` (has `mmmmmm`) -> Delete.
-    *   `axtidakkkkkkkkkkkkkkkkk` (has `kkkkkkkkkkkkkkkk`) -> Delete.
-    *   `g###`, `x####`, `pe###`, `ng#####`, `k#####`, `j#####`, `sa###`, `l####`, `if######` -> Delete (contains `#`).
-    *   `ybertemantapi` -> This looks like spam/typo. I'll delete it.
-    *   `aakujugamausholat` -> This looks like spam/typo. I'll delete it.
-    *   `axpe` -> Keep (no `#`, no excessive repetition).
-    *   `axkd` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axsssssssss` -> Delete.
-    *   `axtidakkkkkkkkkkkkkkkkk` -> Delete.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `axolotl` -> Keep.
-    *   `axkd` -> Keep.
-    *   `axecelsum` -> Keep.
-    *   `axpe` -> Keep.
-    *   `ax......
-</think>nang
+Keramik
+axpe
+axolotl
+axkd
+axecelsum
+axpe
 sinaps
 liks
 ngebut
