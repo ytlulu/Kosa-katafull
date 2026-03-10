@@ -1,6 +1,5 @@
 -- ============================================================
 --   LuluV V5 | Map: Kosa Kata Indo
---   UI Manual (No Library)
 -- ============================================================
 
 local TweenService     = game:GetService("TweenService")
@@ -17,45 +16,63 @@ math.randomseed(os.clock() * 100000)
 -- ============================================================
 -- STATE
 -- ============================================================
-local Username     = ""
-local SelectedMode = "Normal"
-local IsRunning    = false
-local AutoTask     = nil
-local AutoDetect   = true
-local SavedWords   = {}
-local UsedWords    = {}
-local TotalUsed    = 0
-local ShowInfo     = true
-local CounterOn    = false
+local Username      = ""
+local SelectedMode  = "Normal"
+local WordLength    = "Any"   -- "Short" | "Any" | "Long"
+local IsRunning     = false
+local AutoTask      = nil
+local AutoDetect    = true
+local SavedWords    = {}
+local UsedWords     = {}
+local FailWords     = {}   -- local blacklist sementara untuk kata gagal
+local TotalUsed     = 0
+local ShowInfo      = true
+local CounterOn     = false
 local CounterSuffix = ""
-local CurrentBill  = "—"   -- prefix board dari game (disimpan sebelum fire)
-local CurrentSum   = "—"   -- kata terakhir yang disubmit
+local CurrentBill   = "—"
+local CurrentSum    = "not run"
 
 -- ============================================================
 -- SETTINGS
 -- ============================================================
 local CFG = {
-    Delay      = 0.5,
-    Speed      = 0.10,
-    FireSpeed  = 0.6,
+    Delay     = 1.2,
+    Speed     = 0.25,
+    FireSpeed = 0.6,
 }
 
 -- ============================================================
--- LOAD KOSA KATA
+-- KATA SOURCES  (tambah entry di sini → otomatis masuk dropdown)
 -- ============================================================
-local KATA_URLS = {
-    "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/NEXTKATA.txt",
-    "https://raw.githubusercontent.com/damzaky/kumpulan-kata-bahasa-indonesia-KBBI/master/list_1.0.0.txt",
+local KATA_SOURCES = {
+    {name = "KBBI1",   url = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/NEXTKATA.txt"},
+    {name = "KBBI2",       url = "https://raw.githubusercontent.com/damzaky/kumpulan-kata-bahasa-indonesia-KBBI/master/list_1.0.0.txt"},
+    {name = "normal used", url = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/for%20update.txt"},
+    {name = "most counter", url = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/V3%20Serapan"},
 }
 local KATA_BL_URL = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/Blacklist"
-local FRENLY_URL  = "https://raw.githubusercontent.com/ytlulu/Kosa-katafull/refs/heads/main/for%20update.txt"  -- isi URL raw frenlytext di sini
-local KOSA_KATA   = {}
-local KATA_INDEX  = {}
-local FRENLY_KATA  = {}
-local FRENLY_INDEX = {}
-local PriorityFrenly = false
 
-local function BuildIndex()
+-- Data per-source: sourceData[name] = {words={}, index={}}
+local sourceData = {}
+
+-- Combined (semua source digabung)
+local KOSA_KATA  = {}
+local KATA_INDEX = {}
+
+local PriorityOn          = false   -- toggle On Priority
+local SelectedPriorityName = ""     -- nama source yang diprioritaskan
+
+local function BuildSourceIndex(words)
+    local idx = {}
+    for _, word in ipairs(words) do
+        local first = string.upper(string.sub(word, 1, 1))
+        if not idx[first] then idx[first] = {} end
+        table.insert(idx[first], word)
+    end
+    return idx
+end
+
+local function BuildCombinedIndex()
     KATA_INDEX = {}
     for _, word in ipairs(KOSA_KATA) do
         local first = string.upper(string.sub(word, 1, 1))
@@ -64,66 +81,12 @@ local function BuildIndex()
     end
 end
 
-local function BuildFrenlyIndex()
-    FRENLY_INDEX = {}
-    for _, word in ipairs(FRENLY_KATA) do
-        local first = string.upper(string.sub(word, 1, 1))
-        if not FRENLY_INDEX[first] then FRENLY_INDEX[first] = {} end
-        table.insert(FRENLY_INDEX[first], word)
-    end
-end
-
-local function LoadFrenly(statusLabel)
-    if not FRENLY_URL or FRENLY_URL == "" then
-        if statusLabel then
-            statusLabel.Text = "📭 Frenly URL kosong"
-            statusLabel.TextColor3 = Color3.fromRGB(180, 130, 50)
-        end
-        return
-    end
-    task.spawn(function()
-        if statusLabel then statusLabel.Text = "⏳ Memuat frenly..." end
-        local ok, result = pcall(function()
-            return game:HttpGet(FRENLY_URL, true)
-        end)
-        if not ok or not result then
-            if statusLabel then statusLabel.Text = "❌ Gagal load frenly!" end
-            return
-        end
-        FRENLY_KATA = {}
-        local seen = {}
-        for line in result:gmatch("[^\n]+") do
-            local word = line:match("^%s*(.-)%s*$")
-            if word and #word >= 2 then
-                local w = string.lower(word)
-                if not seen[w] then
-                    seen[w] = true
-                    table.insert(FRENLY_KATA, w)
-                end
-            end
-        end
-        BuildFrenlyIndex()
-        print("✅ Loaded frenly:", #FRENLY_KATA)
-        if statusLabel then
-            statusLabel.Text = "✅ " .. #FRENLY_KATA .. " frenly dimuat"
-            statusLabel.TextColor3 = Color3.fromRGB(50, 180, 80)
-        end
-    end)
-end
-
 local function LoadKata(statusLabel)
-    if not KATA_URLS or #KATA_URLS == 0 then
-        if statusLabel then
-            statusLabel.Text = "📭 Kosa kata kosong"
-            statusLabel.TextColor3 = Color3.fromRGB(180, 130, 50)
-        end
-        return
-    end
     task.spawn(function()
         task.wait(0.3)
         if statusLabel then statusLabel.Text = "⏳ Memuat kosa kata..." end
 
-        -- Build blacklist set dari raw URL
+        -- Blacklist
         local blSet = {}
         if KATA_BL_URL and KATA_BL_URL ~= "" then
             local okBL, resBL = pcall(function()
@@ -132,54 +95,58 @@ local function LoadKata(statusLabel)
             if okBL and resBL then
                 for line in resBL:gmatch("[^\n]+") do
                     local w = line:match("^%s*(.-)%s*$")
-                    if w and #w >= 1 then
-                        blSet[string.lower(w)] = true
-                    end
+                    if w and #w >= 1 then blSet[string.lower(w)] = true end
                 end
-                print("✅ Blacklist loaded:", (function() local n=0 for _ in pairs(blSet) do n=n+1 end return n end)(), "kata")
-            else
-                warn("Gagal load blacklist URL")
             end
         end
 
         KOSA_KATA = {}
-        local seen = {}
-        local totalLoaded = 0
+        local combinedSeen = {}
+        local totalLoaded  = 0
 
-        for _, url in ipairs(KATA_URLS) do
-            if url and url ~= "" then
-                local ok, result = pcall(function()
-                    return game:HttpGet(url, true)
-                end)
-                if ok and result then
-                    for line in result:gmatch("[^\n]+") do
-                        local word = line:match("^%s*(.-)%s*$")
-                        if word and #word >= 2 then
-                            -- Pecah berdasarkan spasi atau tanda -
-                            local parts = {}
-                            for part in word:gmatch("[^%s%-]+") do
-                                table.insert(parts, part)
-                            end
-                            for _, part in ipairs(parts) do
-                                local p = string.lower(part)
-                                if #p >= 2 and not seen[p] and not blSet[p] then
-                                    seen[p] = true
+        for _, src in ipairs(KATA_SOURCES) do
+            local ok, result = pcall(function()
+                return game:HttpGet(src.url, true)
+            end)
+            if ok and result then
+                local srcWords = {}
+                local srcSeen  = {}
+                for line in result:gmatch("[^\n]+") do
+                    local word = line:match("^%s*(.-)%s*$")
+                    if word and #word >= 2 then
+                        for part in word:gmatch("[^%s%-]+") do
+                            local p = string.lower(part)
+                            if #p >= 2 and not blSet[p] then
+                                -- per-source (boleh duplikat antar source)
+                                if not srcSeen[p] then
+                                    srcSeen[p] = true
+                                    table.insert(srcWords, p)
+                                end
+                                -- combined (dedup global)
+                                if not combinedSeen[p] then
+                                    combinedSeen[p] = true
                                     table.insert(KOSA_KATA, p)
                                 end
                             end
                         end
                     end
-                    totalLoaded = totalLoaded + 1
-                else
-                    warn("Gagal load URL:", url)
                 end
+                sourceData[src.name] = {
+                    words = srcWords,
+                    index = BuildSourceIndex(srcWords),
+                }
+                totalLoaded = totalLoaded + 1
+                print("✅ Loaded", src.name, ":", #srcWords, "kata")
+            else
+                warn("Gagal load:", src.name)
+                sourceData[src.name] = {words = {}, index = {}}
             end
         end
 
-        BuildIndex()
-        print("✅ Loaded kata:", #KOSA_KATA, "dari", totalLoaded, "URL")
+        BuildCombinedIndex()
+        print("✅ Total gabungan:", #KOSA_KATA, "kata dari", totalLoaded, "source")
         if statusLabel then
-            statusLabel.Text = "✅ " .. #KOSA_KATA .. " kata dimuat (" .. totalLoaded .. " URL)"
+            statusLabel.Text = "✅ " .. #KOSA_KATA .. " kata (" .. totalLoaded .. " source)"
             statusLabel.TextColor3 = Color3.fromRGB(50, 180, 80)
         end
     end)
@@ -209,11 +176,16 @@ local function GetBoardPrefix()
         if not label then return nil end
         local text = label.Text
         if not text or text == "" then return nil end
-        -- Ambil seluruh teks board (huruf kapital semua), bukan cuma 1 huruf
         return string.upper(text:match("^%s*(.-)%s*$") or "")
     end)
     if ok and prefix and #prefix > 0 then return prefix end
     return nil
+end
+
+local function WordLengthOK(word)
+    if WordLength == "Short" then return #word <= 4 end
+    if WordLength == "Long"  then return #word >= 6 end
+    return true
 end
 
 local function FindWord(prefix)
@@ -226,7 +198,8 @@ local function FindWord(prefix)
         local available = {}
         for _, word in ipairs(candidates) do
             if string.sub(word, 1, #lowerPrefix) == lowerPrefix
-                and not UsedWords[word] and not SavedWords[word] then
+                and not UsedWords[word] and not SavedWords[word] and not FailWords[word]
+                and WordLengthOK(word) then
                 if CounterOn and CounterSuffix ~= "" then
                     local suffix = string.lower(CounterSuffix)
                     if string.sub(word, -#suffix) ~= suffix then continue end
@@ -238,7 +211,8 @@ local function FindWord(prefix)
         if #available == 0 and CounterOn and CounterSuffix ~= "" then
             for _, word in ipairs(candidates) do
                 if string.sub(word, 1, #lowerPrefix) == lowerPrefix
-                    and not UsedWords[word] and not SavedWords[word] then
+                    and not UsedWords[word] and not SavedWords[word] and not FailWords[word]
+                    and WordLengthOK(word) then
                     table.insert(available, word)
                 end
             end
@@ -246,17 +220,18 @@ local function FindWord(prefix)
         return available
     end
 
-    -- Priority frenly dulu kalau ON
-    if PriorityFrenly and #FRENLY_KATA > 0 then
-        local frenlyAvail = searchIn(FRENLY_INDEX)
-        if #frenlyAvail > 0 then
-            local picked = frenlyAvail[math.random(#frenlyAvail)]
-            UsedWords[picked] = true
-            return picked
+    if PriorityOn and SelectedPriorityName ~= "" then
+        local src = sourceData[SelectedPriorityName]
+        if src and src.index then
+            local priorityAvail = searchIn(src.index)
+            if #priorityAvail > 0 then
+                local picked = priorityAvail[math.random(#priorityAvail)]
+                UsedWords[picked] = true
+                return picked
+            end
         end
     end
 
-    -- Fallback ke KOSA_KATA biasa
     local available = searchIn(KATA_INDEX)
     if #available == 0 then return nil end
     local picked = available[math.random(#available)]
@@ -265,7 +240,6 @@ local function FindWord(prefix)
 end
 
 local function Submit(bill, sum)
-    -- sisa = bagian sum setelah bill
     local sisa = string.sub(sum, #bill + 1)
     pcall(function()
         ReplicatedStorage.Remotes.SubmitWord:FireServer(sisa)
@@ -277,7 +251,6 @@ end
 local function PlayNormal(bill, word)
     if not word then return end
     task.wait(CFG.Delay)
-    -- sisa = huruf setelah bill
     local sisa = string.sub(word, #bill + 1)
     for i = 1, #sisa do
         if not IsRunning then return end
@@ -308,32 +281,27 @@ local function PlayRisk(bill, word)
     Submit(bill, word)
 end
 
-local currentWordLabel = nil  -- diisi setelah GUI dibuat
-
 local function StartAuto()
     if IsRunning then return end
     IsRunning = true
+    CurrentSum = "not run"
     AutoTask = task.spawn(function()
-        local lockedPrefix = nil  -- prefix yang sedang dikerjakan (locked)
+        local lockedPrefix = nil
         while IsRunning do
             local prefix = GetBoardPrefix()
 
-            -- Kalau board kosong, unlock
             if not prefix then
                 lockedPrefix = nil
-                if currentWordLabel then currentWordLabel.Text = "⏳ Menunggu board..." end
+                CurrentSum = "waiting"
                 task.wait(0.3)
                 continue
             end
 
-            -- Lock prefix baru hanya kalau belum lock atau lock sebelumnya sudah selesai
             if not lockedPrefix then
                 lockedPrefix = prefix
                 UsedWords = {}
             end
 
-            -- Kalau board berubah tapi bukan karena kata kita (prefix baru beneran)
-            -- prefix baru = tidak diawali lockedPrefix (bukan sisa kata kita)
             if prefix ~= lockedPrefix and not (prefix:sub(1, #lockedPrefix) == lockedPrefix) then
                 lockedPrefix = prefix
                 UsedWords = {}
@@ -342,19 +310,12 @@ local function StartAuto()
             CurrentBill = lockedPrefix
             local word = FindWord(lockedPrefix)
             if not word then
-                if currentWordLabel then
-                    currentWordLabel.Text = "⚠️ Tidak ada kata"
-                    currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
-                end
+                CurrentSum = "kata habis"
                 task.wait(0.3)
                 continue
             end
 
             CurrentSum = word
-            if currentWordLabel then
-                currentWordLabel.Text = "📝 " .. word
-                currentWordLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
-            end
 
             if SelectedMode == "Normal" then
                 PlayNormal(lockedPrefix, word)
@@ -364,21 +325,19 @@ local function StartAuto()
                 PlayRisk(lockedPrefix, word)
             end
 
-            -- Retry loop: tunggu board hilang (sukses) atau kata habis
             local retryWord = word
             while IsRunning do
                 task.wait(0.8)
                 local boardNow = GetBoardPrefix()
 
-                -- Board hilang = sukses
                 if not boardNow then
                     lockedPrefix = nil
                     break
                 end
 
-                -- Board masih ada = gagal (apapun isinya, kita tetap pakai lockedPrefix)
-                -- Log cekfail
+                -- Gagal: simpan ke FailWords (local blacklist sementara) + file
                 pcall(function()
+                    FailWords[retryWord] = true
                     if writefile then
                         local ok2, raw = pcall(readfile, "cekfail.txt")
                         local content = (ok2 and raw) and raw or ""
@@ -391,14 +350,9 @@ local function StartAuto()
                 UsedWords[retryWord]  = true
                 TotalUsed = math.max(0, TotalUsed - 1)
 
-                -- Cari kata berikutnya pakai lockedPrefix (bukan boardNow)
                 local next = FindWord(lockedPrefix)
                 if not next then
-                    if currentWordLabel then
-                        currentWordLabel.Text = "⚠️ Kata habis"
-                        currentWordLabel.TextColor3 = Color3.fromRGB(220, 120, 30)
-                    end
-                    -- Tunggu board hilang sendiri
+                    CurrentSum = "kata habis"
                     while IsRunning do
                         task.wait(0.3)
                         if not GetBoardPrefix() then lockedPrefix = nil break end
@@ -407,11 +361,7 @@ local function StartAuto()
                 end
 
                 retryWord  = next
-                CurrentSum = next
-                if currentWordLabel then
-                    currentWordLabel.Text = "🔄 " .. next
-                    currentWordLabel.TextColor3 = Color3.fromRGB(255, 160, 30)
-                end
+                CurrentSum = "retry " .. next
 
                 if SelectedMode == "Normal" then
                     PlayNormal(lockedPrefix, next)
@@ -422,7 +372,7 @@ local function StartAuto()
                 end
             end
         end
-        if currentWordLabel then currentWordLabel.Text = "⏸ Stopped" end
+        CurrentSum = "stopped"
     end)
 end
 
@@ -435,7 +385,7 @@ local function StopAuto()
 end
 
 -- ============================================================
--- GUI HELPERS (style dari LuluV V3)
+-- GUI HELPERS
 -- ============================================================
 local function makeHover(btn, base, hov)
     btn.MouseEnter:Connect(function()
@@ -459,7 +409,7 @@ local function mkLabel(parent, text, yOff, h, size, bold, color)
     l.BackgroundTransparency = 1
     l.Text = text
     l.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
-    l.TextSize = size or 13
+    l.TextSize = size or 12
     l.TextColor3 = color or Color3.fromRGB(40, 50, 70)
     l.TextXAlignment = Enum.TextXAlignment.Left
     l.Parent = parent
@@ -473,7 +423,7 @@ local function mkBtn(parent, text, yOff, h, col)
     b.BackgroundColor3 = col or Color3.fromRGB(40, 120, 255)
     b.Text = text
     b.Font = Enum.Font.GothamBold
-    b.TextSize = 13
+    b.TextSize = 12
     b.TextColor3 = Color3.fromRGB(255, 255, 255)
     b.BorderSizePixel = 0
     b.Parent = parent
@@ -487,7 +437,28 @@ local function mkBtn(parent, text, yOff, h, col)
     return b
 end
 
--- Divider
+-- Tombol setengah lebar (untuk pasangan 2 tombol)
+local function mkHalfBtn(parent, text, xScale, xOff, yOff, h, col)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0.5, -12, 0, h)
+    b.Position = UDim2.new(xScale, xOff, 0, yOff)
+    b.BackgroundColor3 = col or Color3.fromRGB(40, 120, 255)
+    b.Text = text
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 11
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.BorderSizePixel = 0
+    b.Parent = parent
+    mkCorner(b, 8)
+    local hov = Color3.fromRGB(
+        math.clamp(col and col.R*255+25 or 65, 0, 255),
+        math.clamp(col and col.G*255+25 or 145, 0, 255),
+        math.clamp(col and col.B*255+25 or 255, 0, 255)
+    )
+    makeHover(b, col or Color3.fromRGB(40,120,255), hov)
+    return b
+end
+
 local function mkDivider(parent, yOff)
     local d = Instance.new("Frame")
     d.Size = UDim2.new(1, -16, 0, 1)
@@ -498,12 +469,11 @@ local function mkDivider(parent, yOff)
     return d
 end
 
--- Toggle button (on/off style)
 local function mkToggle(parent, label, yOff, default, callback)
     local state = {default}
 
     local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, -16, 0, 36)
+    bg.Size = UDim2.new(1, -16, 0, 32)
     bg.Position = UDim2.new(0, 8, 0, yOff)
     bg.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
     bg.BorderSizePixel = 0
@@ -516,26 +486,26 @@ local function mkToggle(parent, label, yOff, default, callback)
     lbl.BackgroundTransparency = 1
     lbl.Text = label
     lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
+    lbl.TextSize = 12
     lbl.TextColor3 = Color3.fromRGB(40, 50, 70)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = bg
 
     local track = Instance.new("Frame")
-    track.Size = UDim2.new(0, 42, 0, 22)
-    track.Position = UDim2.new(1, -52, 0.5, -11)
+    track.Size = UDim2.new(0, 38, 0, 20)
+    track.Position = UDim2.new(1, -46, 0.5, -10)
     track.BackgroundColor3 = default and Color3.fromRGB(40,180,80) or Color3.fromRGB(190,195,210)
     track.BorderSizePixel = 0
     track.Parent = bg
-    mkCorner(track, 11)
+    mkCorner(track, 10)
 
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 18, 0, 18)
-    knob.Position = default and UDim2.new(0, 22, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = default and UDim2.new(0, 20, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     knob.BorderSizePixel = 0
     knob.Parent = track
-    mkCorner(knob, 9)
+    mkCorner(knob, 8)
 
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 1, 0)
@@ -550,7 +520,7 @@ local function mkToggle(parent, label, yOff, default, callback)
             BackgroundColor3 = on and Color3.fromRGB(40,180,80) or Color3.fromRGB(190,195,210)
         }):Play()
         TweenService:Create(knob, TweenInfo.new(0.2), {
-            Position = on and UDim2.new(0,22,0.5,-9) or UDim2.new(0,2,0.5,-9)
+            Position = on and UDim2.new(0,20,0.5,-8) or UDim2.new(0,2,0.5,-8)
         }):Play()
         callback(on)
     end)
@@ -558,13 +528,12 @@ local function mkToggle(parent, label, yOff, default, callback)
     return bg
 end
 
--- Dropdown
 local function mkDropdown(parent, label, options, default, yOff, callback)
     local selected = {default}
     local open = {false}
 
     local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, -16, 0, 36)
+    bg.Size = UDim2.new(1, -16, 0, 32)
     bg.Position = UDim2.new(0, 8, 0, yOff)
     bg.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
     bg.BorderSizePixel = 0
@@ -578,34 +547,31 @@ local function mkDropdown(parent, label, options, default, yOff, callback)
     lbl.BackgroundTransparency = 1
     lbl.Text = label
     lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
+    lbl.TextSize = 12
     lbl.TextColor3 = Color3.fromRGB(40, 50, 70)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = bg
 
     local valBtn = Instance.new("TextButton")
-    valBtn.Size = UDim2.new(0, 110, 0, 28)
-    valBtn.Position = UDim2.new(1, -118, 0.5, -14)
+    valBtn.Size = UDim2.new(0, 100, 0, 24)
+    valBtn.Position = UDim2.new(1, -108, 0.5, -12)
     valBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
     valBtn.Text = default .. " ▾"
     valBtn.Font = Enum.Font.GothamBold
-    valBtn.TextSize = 12
+    valBtn.TextSize = 11
     valBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     valBtn.BorderSizePixel = 0
     valBtn.Parent = bg
     mkCorner(valBtn, 6)
 
-    -- dropMenu di-parent ke rightPanel supaya tidak ter-clip scroll/container
-    -- posisi dihitung saat dibuka
     local dropMenu = Instance.new("Frame")
-    dropMenu.Size = UDim2.new(0, 110, 0, #options * 32)
+    dropMenu.Size = UDim2.new(0, 100, 0, #options * 28)
     dropMenu.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     dropMenu.BorderSizePixel = 0
     dropMenu.Visible = false
     dropMenu.ZIndex = 200
     mkCorner(dropMenu, 8)
 
-    -- shadow
     local ds = Instance.new("Frame")
     ds.Size = UDim2.new(1, 8, 1, 8)
     ds.Position = UDim2.new(0, -4, 0, -4)
@@ -618,12 +584,12 @@ local function mkDropdown(parent, label, options, default, yOff, callback)
 
     for i, opt in ipairs(options) do
         local ob = Instance.new("TextButton")
-        ob.Size = UDim2.new(1, 0, 0, 32)
-        ob.Position = UDim2.new(0, 0, 0, (i-1)*32)
+        ob.Size = UDim2.new(1, 0, 0, 28)
+        ob.Position = UDim2.new(0, 0, 0, (i-1)*28)
         ob.BackgroundTransparency = 1
         ob.Text = opt
         ob.Font = Enum.Font.Gotham
-        ob.TextSize = 13
+        ob.TextSize = 12
         ob.TextColor3 = Color3.fromRGB(40, 50, 70)
         ob.ZIndex = 201
         ob.Parent = dropMenu
@@ -643,8 +609,7 @@ local function mkDropdown(parent, label, options, default, yOff, callback)
     valBtn.MouseButton1Click:Connect(function()
         open[1] = not open[1]
         if open[1] then
-            -- Posisi absolut valBtn relatif ke mainFrame
-            local absPos = valBtn.AbsolutePosition
+            local absPos  = valBtn.AbsolutePosition
             local framePos = mainFrame.AbsolutePosition
             local rx = absPos.X - framePos.X
             local ry = absPos.Y - framePos.Y + valBtn.AbsoluteSize.Y + 4
@@ -657,7 +622,7 @@ local function mkDropdown(parent, label, options, default, yOff, callback)
         end
     end)
 
-    return bg, 36
+    return bg, 32
 end
 
 -- ============================================================
@@ -665,27 +630,88 @@ end
 -- ============================================================
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LuluVV4"
+screenGui.Name = "LuluVV5"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = guiParent
 
+-- ============================================================
+-- TOAST NOTIFICATION (kanan bawah)
+-- ============================================================
+local toastQueue = {}
+local toastRunning = false
+
+local function showToast(msg, color)
+    color = color or Color3.fromRGB(30, 30, 40)
+    table.insert(toastQueue, {msg = msg, color = color})
+    if toastRunning then return end
+    toastRunning = true
+    task.spawn(function()
+        while #toastQueue > 0 do
+            local item = table.remove(toastQueue, 1)
+
+            local toast = Instance.new("Frame")
+            toast.Size = UDim2.new(0, 220, 0, 36)
+            toast.Position = UDim2.new(1, -10, 1, 10)
+            toast.AnchorPoint = Vector2.new(1, 1)
+            toast.BackgroundColor3 = item.color
+            toast.BackgroundTransparency = 0.1
+            toast.BorderSizePixel = 0
+            toast.ZIndex = 999
+            toast.ClipsDescendants = true
+            toast.Parent = screenGui
+            local corner = Instance.new("UICorner", toast)
+            corner.CornerRadius = UDim.new(0, 8)
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, -16, 1, 0)
+            lbl.Position = UDim2.new(0, 8, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = item.msg
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 11
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.TextTruncate = Enum.TextTruncate.AtEnd
+            lbl.ZIndex = 1000
+            lbl.Parent = toast
+
+            -- Slide in
+            TweenService:Create(toast, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = UDim2.new(1, -10, 1, -10)
+            }):Play()
+
+            task.wait(2.8)
+
+            -- Slide out
+            local out = TweenService:Create(toast, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Position = UDim2.new(1, -10, 1, 10)
+            })
+            out:Play()
+            task.wait(0.22)
+            pcall(function() toast:Destroy() end)
+            task.wait(0.1)
+        end
+        toastRunning = false
+    end)
+end
+
 -- Lotus button
 local lotusBtn = Instance.new("TextButton")
-lotusBtn.Size = UDim2.new(0, 56, 0, 56)
-lotusBtn.Position = UDim2.new(0.04, 0, 0.75, 0)
+lotusBtn.Size = UDim2.new(0, 44, 0, 44)
+lotusBtn.Position = UDim2.new(0, 10, 0, 10)
 lotusBtn.Text = "🌸"
-lotusBtn.TextSize = 32
+lotusBtn.TextSize = 26
 lotusBtn.BackgroundTransparency = 1
 lotusBtn.BorderSizePixel = 0
 lotusBtn.Parent = screenGui
 
 -- Info overlay (kanan atas)
 local infoPanel = Instance.new("Frame")
-infoPanel.Size = UDim2.new(0, 160, 0, 88)
-infoPanel.Position = UDim2.new(1, -170, 0, 10)
+infoPanel.Size = UDim2.new(0, 140, 0, 76)
+infoPanel.Position = UDim2.new(1, -150, 0, 10)
 infoPanel.BackgroundColor3 = Color3.fromRGB(15, 20, 35)
-infoPanel.BackgroundTransparency = 0.25
+infoPanel.BackgroundTransparency = 0.2
 infoPanel.BorderSizePixel = 0
 infoPanel.Visible = ShowInfo
 infoPanel.Parent = screenGui
@@ -693,12 +719,12 @@ mkCorner(infoPanel, 10)
 
 local function mkInfoLine(text, yOff)
     local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1, -10, 0, 18)
+    l.Size = UDim2.new(1, -10, 0, 16)
     l.Position = UDim2.new(0, 6, 0, yOff)
     l.BackgroundTransparency = 1
     l.Text = text
     l.Font = Enum.Font.GothamBold
-    l.TextSize = 11
+    l.TextSize = 10
     l.TextColor3 = Color3.fromRGB(200, 220, 255)
     l.TextXAlignment = Enum.TextXAlignment.Left
     l.TextTruncate = Enum.TextTruncate.AtEnd
@@ -706,69 +732,65 @@ local function mkInfoLine(text, yOff)
     return l
 end
 
-local infoLbl_Bill = mkInfoLine("Bill : —", 6)
-local infoLbl_Sum  = mkInfoLine("Sum  : —", 24)
-local infoLbl_Av   = mkInfoLine("Av   : —", 42)
-local infoLbl_Us   = mkInfoLine("Us   : —", 60)
+local infoLbl_Bill = mkInfoLine("Bill : —", 4)
+local infoLbl_Sum  = mkInfoLine("Sum  : —", 20)
+local infoLbl_Av   = mkInfoLine("Av   : —", 36)
+local infoLbl_Us   = mkInfoLine("Us   : —", 52)
 
--- Update info setiap 0.5 detik
 task.spawn(function()
     while true do
         task.wait(0.5)
         if not infoPanel or not infoPanel.Parent then break end
         if infoPanel.Visible then
             infoLbl_Bill.Text = "Bill : " .. CurrentBill
-
             infoLbl_Sum.Text  = "Sum  : " .. CurrentSum
-
             local avCount = 0
             if CurrentBill ~= "—" then
                 local lp = string.lower(CurrentBill)
                 local fl = string.upper(string.sub(CurrentBill, 1, 1))
                 local bucket = KATA_INDEX[fl] or {}
                 for _, w in ipairs(bucket) do
-                    if string.sub(w, 1, #lp) == lp and not UsedWords[w] and not SavedWords[w] then
+                    if string.sub(w, 1, #lp) == lp and not UsedWords[w] and not SavedWords[w] and not FailWords[w] then
                         avCount = avCount + 1
                     end
                 end
             end
-            infoLbl_Av.Text  = "Av   : " .. avCount
-            infoLbl_Us.Text  = "Us   : " .. TotalUsed
+            infoLbl_Av.Text = "Av   : " .. avCount
+            infoLbl_Us.Text = "Us   : " .. TotalUsed
         end
     end
 end)
 
--- Main frame
+-- Main frame (~2/3 dari ukuran asli)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 460, 0, 400)
-mainFrame.Position = UDim2.new(0.5, -230, 0.5, -200)
+mainFrame.Size = UDim2.new(0, 310, 0, 270)
+mainFrame.Position = UDim2.new(0.5, -155, 0.5, -135)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-mainFrame.BackgroundTransparency = 0.05
+mainFrame.BackgroundTransparency = 0.8
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Visible = false
 mainFrame.Parent = screenGui
-mkCorner(mainFrame, 16)
+mkCorner(mainFrame, 14)
 
--- Shadow
 local shadowFrame = Instance.new("Frame")
-shadowFrame.Size = UDim2.new(1, 20, 1, 20)
-shadowFrame.Position = UDim2.new(0, -10, 0, -10)
+shadowFrame.Size = UDim2.new(1, 18, 1, 18)
+shadowFrame.Position = UDim2.new(0, -9, 0, -9)
 shadowFrame.BackgroundColor3 = Color3.fromRGB(20, 90, 200)
 shadowFrame.BackgroundTransparency = 0.88
 shadowFrame.BorderSizePixel = 0
 shadowFrame.ZIndex = 0
 shadowFrame.Parent = mainFrame
-mkCorner(shadowFrame, 18)
+mkCorner(shadowFrame, 16)
 
 -- Title bar
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 48)
+titleBar.Size = UDim2.new(1, 0, 0, 36)
 titleBar.BackgroundColor3 = Color3.fromRGB(30, 110, 240)
 titleBar.BorderSizePixel = 0
 titleBar.ZIndex = 2
 titleBar.Parent = mainFrame
-mkCorner(titleBar, 16)
+mkCorner(titleBar, 14)
 
 local tbGrad = Instance.new("UIGradient", titleBar)
 tbGrad.Color = ColorSequence.new{
@@ -777,10 +799,9 @@ tbGrad.Color = ColorSequence.new{
 }
 tbGrad.Rotation = 45
 
--- Fix round corners on bottom of titlebar
 local titleFix = Instance.new("Frame")
-titleFix.Size = UDim2.new(1, 0, 0, 16)
-titleFix.Position = UDim2.new(0, 0, 1, -16)
+titleFix.Size = UDim2.new(1, 0, 0, 14)
+titleFix.Position = UDim2.new(0, 0, 1, -14)
 titleFix.BackgroundColor3 = Color3.fromRGB(30, 110, 240)
 titleFix.BorderSizePixel = 0
 titleFix.ZIndex = 1
@@ -790,55 +811,55 @@ tfGrad.Color = tbGrad.Color
 tfGrad.Rotation = 45
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -100, 1, 0)
-titleLabel.Position = UDim2.new(0, 16, 0, 0)
+titleLabel.Size = UDim2.new(1, -80, 1, 0)
+titleLabel.Position = UDim2.new(0, 12, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "🌸 LuluV V5 – Kosa Kata Indo"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 17
+titleLabel.TextSize = 13
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.ZIndex = 3
 titleLabel.Parent = titleBar
 
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 36, 0, 36)
-closeBtn.Position = UDim2.new(1, -44, 0, 6)
+closeBtn.Size = UDim2.new(0, 28, 0, 28)
+closeBtn.Position = UDim2.new(1, -34, 0, 4)
 closeBtn.Text = "×"
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 26
+closeBtn.TextSize = 20
 closeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 closeBtn.BackgroundTransparency = 0.1
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.BorderSizePixel = 0
 closeBtn.ZIndex = 3
 closeBtn.Parent = titleBar
-mkCorner(closeBtn, 8)
+mkCorner(closeBtn, 7)
 makeHover(closeBtn, Color3.fromRGB(255,80,80), Color3.fromRGB(255,110,110))
 
--- Left panel (sidebar menu)
+-- Left panel (sidebar)
 local leftPanel = Instance.new("Frame")
-leftPanel.Size = UDim2.new(0, 120, 1, -48)
-leftPanel.Position = UDim2.new(0, 0, 0, 48)
+leftPanel.Size = UDim2.new(0, 90, 1, -36)
+leftPanel.Position = UDim2.new(0, 0, 0, 36)
 leftPanel.BackgroundColor3 = Color3.fromRGB(245, 248, 255)
 leftPanel.BorderSizePixel = 0
 leftPanel.Parent = mainFrame
 
 -- Right panel (content)
 local rightPanel = Instance.new("Frame")
-rightPanel.Size = UDim2.new(1, -120, 1, -48)
-rightPanel.Position = UDim2.new(0, 120, 0, 48)
+rightPanel.Size = UDim2.new(1, -90, 1, -36)
+rightPanel.Position = UDim2.new(0, 90, 0, 36)
 rightPanel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 rightPanel.BorderSizePixel = 0
 rightPanel.ClipsDescendants = false
 rightPanel.Parent = mainFrame
 
 local container = Instance.new("ScrollingFrame")
-container.Size = UDim2.new(1, -16, 1, -16)
-container.Position = UDim2.new(0, 8, 0, 8)
+container.Size = UDim2.new(1, -12, 1, -12)
+container.Position = UDim2.new(0, 6, 0, 6)
 container.BackgroundTransparency = 1
 container.BorderSizePixel = 0
-container.ScrollBarThickness = 5
+container.ScrollBarThickness = 4
 container.ScrollBarImageColor3 = Color3.fromRGB(30, 110, 240)
 container.CanvasSize = UDim2.new(0, 0, 0, 0)
 container.Parent = rightPanel
@@ -848,24 +869,24 @@ container.Parent = rightPanel
 -- ============================================================
 local function mkMenuBtn(text, yOff)
     local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, -12, 0, 38)
-    b.Position = UDim2.new(0, 6, 0, yOff)
+    b.Size = UDim2.new(1, -10, 0, 30)
+    b.Position = UDim2.new(0, 5, 0, yOff)
     b.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
     b.BackgroundTransparency = 1
     b.Text = text
     b.Font = Enum.Font.GothamBold
-    b.TextSize = 12
+    b.TextSize = 10
     b.TextColor3 = Color3.fromRGB(80, 90, 120)
     b.BorderSizePixel = 0
     b.Parent = leftPanel
-    mkCorner(b, 8)
+    mkCorner(b, 7)
     makeHover(b, Color3.fromRGB(245,248,255), Color3.fromRGB(220,230,255))
     return b
 end
 
 local mainMenuBtn = mkMenuBtn("⚙️ Main",     8)
-local miscMenuBtn = mkMenuBtn("🔧 Misc",    54)
-local settMenuBtn = mkMenuBtn("🎯 Settings",100)
+local miscMenuBtn = mkMenuBtn("🔧 Misc",    44)
+local settMenuBtn = mkMenuBtn("🎯 Settings",80)
 
 local function setActiveMenu(btn)
     for _, b in ipairs({mainMenuBtn, miscMenuBtn, settMenuBtn}) do
@@ -876,9 +897,6 @@ local function setActiveMenu(btn)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 end
 
--- ============================================================
--- CLEAR CONTAINER
--- ============================================================
 local function clearContainer()
     for _, c in ipairs(container:GetChildren()) do
         c:Destroy()
@@ -890,16 +908,16 @@ end
 -- ============================================================
 local function buildMainUI()
     clearContainer()
-    local y = 12
+    local y = 10
 
-    mkLabel(container, "Mode Auto", y, 20, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 24
+    mkLabel(container, "Mode", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
 
-    -- Mode selector: 4 tombol horizontal
+    -- Mode selector
     local MODES = {"Normal", "Mid", "Brutal"}
     local modeButtons = {}
     local modeBg = Instance.new("Frame")
-    modeBg.Size = UDim2.new(1, -16, 0, 36)
+    modeBg.Size = UDim2.new(1, -16, 0, 30)
     modeBg.Position = UDim2.new(0, 8, 0, y)
     modeBg.BackgroundColor3 = Color3.fromRGB(235, 238, 248)
     modeBg.BorderSizePixel = 0
@@ -911,9 +929,7 @@ local function buildMainUI()
 
     local function refreshModeButtons()
         for _, info in ipairs(modeButtons) do
-            local isActive = (info.mode == SelectedMode)
-            -- Set langsung tanpa tween supaya visual selalu sync saat rebuild
-            info.btn.BackgroundColor3 = isActive and COL_ON or COL_OFF
+            info.btn.BackgroundColor3 = (info.mode == SelectedMode) and COL_ON or COL_OFF
         end
     end
 
@@ -921,11 +937,10 @@ local function buildMainUI()
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1/#MODES, i < #MODES and -2 or 0, 1, -6)
         btn.Position = UDim2.new((i-1)/#MODES, i == 1 and 3 or 1, 0, 3)
-        -- Baca SelectedMode langsung saat build (fix bug visual reset)
         btn.BackgroundColor3 = (modeName == SelectedMode) and COL_ON or COL_OFF
         btn.Text = modeName
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 11
+        btn.TextSize = 10
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.BorderSizePixel = 0
         btn.Parent = modeBg
@@ -937,19 +952,62 @@ local function buildMainUI()
             refreshModeButtons()
         end)
     end
-    y = y + 46
+    y = y + 38
+
+    -- Word Length selector (Short / Any / Long)
+    mkLabel(container, "Priority Used", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
+
+    local LENGTHS = {"Short", "Any", "Long"}
+    local lenButtons = {}
+    local lenBg = Instance.new("Frame")
+    lenBg.Size = UDim2.new(1, -16, 0, 30)
+    lenBg.Position = UDim2.new(0, 8, 0, y)
+    lenBg.BackgroundColor3 = Color3.fromRGB(235, 238, 248)
+    lenBg.BorderSizePixel = 0
+    lenBg.Parent = container
+    mkCorner(lenBg, 8)
+
+    local COL_LEN_ON  = Color3.fromRGB(40, 120, 255)
+    local COL_LEN_OFF = Color3.fromRGB(160, 165, 180)
+
+    local function refreshLenButtons()
+        for _, info in ipairs(lenButtons) do
+            info.btn.BackgroundColor3 = (info.len == WordLength) and COL_LEN_ON or COL_LEN_OFF
+        end
+    end
+
+    for i, lenName in ipairs(LENGTHS) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1/#LENGTHS, i < #LENGTHS and -2 or 0, 1, -6)
+        btn.Position = UDim2.new((i-1)/#LENGTHS, i == 1 and 3 or 1, 0, 3)
+        btn.BackgroundColor3 = (lenName == WordLength) and COL_LEN_ON or COL_LEN_OFF
+        btn.Text = lenName
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 10
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.BorderSizePixel = 0
+        btn.Parent = lenBg
+        mkCorner(btn, 6)
+        table.insert(lenButtons, {btn = btn, len = lenName})
+
+        btn.MouseButton1Click:Connect(function()
+            WordLength = lenName
+            refreshLenButtons()
+        end)
+    end
+    y = y + 38
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- ===== SETTINGS =====
-    mkLabel(container, "Settings", y, 20, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 24
+    -- Settings number inputs
+    mkLabel(container, "Settings", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
 
-    -- Helper: number input row
     local function mkNumberInput(labelText, yOff, defaultVal, step, minVal, maxVal, onChange)
         local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(1, -16, 0, 36)
+        bg.Size = UDim2.new(1, -16, 0, 30)
         bg.Position = UDim2.new(0, 8, 0, yOff)
         bg.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
         bg.BorderSizePixel = 0
@@ -958,49 +1016,49 @@ local function buildMainUI()
 
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(0.55, 0, 1, 0)
-        lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.Position = UDim2.new(0, 8, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text = labelText
         lbl.Font = Enum.Font.Gotham
-        lbl.TextSize = 12
+        lbl.TextSize = 10
         lbl.TextColor3 = Color3.fromRGB(40, 50, 70)
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.Parent = bg
 
         local minusBtn = Instance.new("TextButton")
-        minusBtn.Size = UDim2.new(0, 26, 0, 26)
-        minusBtn.Position = UDim2.new(1, -110, 0.5, -13)
+        minusBtn.Size = UDim2.new(0, 22, 0, 22)
+        minusBtn.Position = UDim2.new(1, -90, 0.5, -11)
         minusBtn.Text = "−"
         minusBtn.Font = Enum.Font.GothamBold
-        minusBtn.TextSize = 16
+        minusBtn.TextSize = 14
         minusBtn.BackgroundColor3 = Color3.fromRGB(200, 210, 230)
         minusBtn.TextColor3 = Color3.fromRGB(40, 50, 70)
         minusBtn.BorderSizePixel = 0
         minusBtn.Parent = bg
-        mkCorner(minusBtn, 6)
+        mkCorner(minusBtn, 5)
 
         local valLabel = Instance.new("TextLabel")
-        valLabel.Size = UDim2.new(0, 46, 0, 26)
-        valLabel.Position = UDim2.new(1, -80, 0.5, -13)
+        valLabel.Size = UDim2.new(0, 38, 0, 22)
+        valLabel.Position = UDim2.new(1, -64, 0.5, -11)
         valLabel.BackgroundTransparency = 1
         valLabel.Text = tostring(defaultVal)
         valLabel.Font = Enum.Font.GothamBold
-        valLabel.TextSize = 13
+        valLabel.TextSize = 11
         valLabel.TextColor3 = Color3.fromRGB(40, 120, 255)
         valLabel.TextXAlignment = Enum.TextXAlignment.Center
         valLabel.Parent = bg
 
         local plusBtn = Instance.new("TextButton")
-        plusBtn.Size = UDim2.new(0, 26, 0, 26)
-        plusBtn.Position = UDim2.new(1, -30, 0.5, -13)
+        plusBtn.Size = UDim2.new(0, 22, 0, 22)
+        plusBtn.Position = UDim2.new(1, -26, 0.5, -11)
         plusBtn.Text = "+"
         plusBtn.Font = Enum.Font.GothamBold
-        plusBtn.TextSize = 16
+        plusBtn.TextSize = 14
         plusBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
         plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         plusBtn.BorderSizePixel = 0
         plusBtn.Parent = bg
-        mkCorner(plusBtn, 6)
+        mkCorner(plusBtn, 5)
 
         local cur = {defaultVal}
         local function update(v)
@@ -1016,75 +1074,33 @@ local function buildMainUI()
         return bg
     end
 
-    mkNumberInput("Delay (board muncul)", y, CFG.Delay, 0.1, 0, 3, function(v)
-        CFG.Delay = v
-    end)
-    y = y + 44
+    mkNumberInput("Delay", y, CFG.Delay, 0.1, 0, 3, function(v) CFG.Delay = v end)
+    y = y + 36
 
-    mkNumberInput("Speed (per karakter)", y, CFG.Speed, 0.05, 0.01, 1, function(v)
-        CFG.Speed = v
-    end)
-    y = y + 44
+    mkNumberInput("Speed", y, CFG.Speed, 0.01, 0.01, 1, function(v) CFG.Speed = v end)
+    y = y + 36
 
-    mkNumberInput("Fire Speed (antar kata)", y, CFG.FireSpeed, 0.1, 0.1, 5, function(v)
-        CFG.FireSpeed = v
-    end)
-    y = y + 44
+    mkNumberInput("Fire Speed", y, CFG.FireSpeed, 0.1, 0.1, 5, function(v) CFG.FireSpeed = v end)
+    y = y + 36
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Start toggle
-    local startToggle
-    startToggle = mkToggle(container, "Start Auto", y, false, function(on)
+    -- Start toggle (default = IsRunning agar tidak reset saat pindah tab)
+    mkToggle(container, "Start Auto", y, IsRunning, function(on)
         if on then StartAuto() else StopAuto() end
     end)
-    y = y + 46
+    y = y + 40
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Sum: display kata + input manual kalau tidak ada di kosa kata
-    mkLabel(container, "Kata saat ini:", y, 18, 11, false, Color3.fromRGB(100,110,140))
+    local statusSbl = mkLabel(container, "⏳ Memuat kosa kata...", y, 16, 10, false, Color3.fromRGB(130,140,160))
     y = y + 22
-
-    local wordBox = Instance.new("Frame")
-    wordBox.Size = UDim2.new(1, -16, 0, 38)
-    wordBox.Position = UDim2.new(0, 8, 0, y)
-    wordBox.BackgroundColor3 = Color3.fromRGB(240, 244, 255)
-    wordBox.BorderSizePixel = 0
-    wordBox.Parent = container
-    mkCorner(wordBox, 8)
-
-    local wordLbl = Instance.new("TextButton")
-    wordLbl.Size = UDim2.new(1, -12, 1, 0)
-    wordLbl.Position = UDim2.new(0, 6, 0, 0)
-    wordLbl.BackgroundTransparency = 1
-    wordLbl.Text = "⏳ Belum jalan..."
-    wordLbl.Font = Enum.Font.GothamBold
-    wordLbl.TextSize = 13
-    wordLbl.TextColor3 = Color3.fromRGB(40, 120, 255)
-    wordLbl.TextXAlignment = Enum.TextXAlignment.Left
-    wordLbl.BorderSizePixel = 0
-    wordLbl.Parent = wordBox
-
-
-
-    currentWordLabel = wordLbl
-    y = y + 48
-
-    mkDivider(container, y)
-    y = y + 12
-
-    -- Status kata loaded
-    local statusLbl = mkLabel(container, "⏳ Memuat kosa kata...", y, 20, 11, false, Color3.fromRGB(130,140,160))
-    y = y + 28
 
     container.CanvasSize = UDim2.new(0, 0, 0, y)
 
-    -- trigger load
-    LoadKata(statusLbl)
-    LoadFrenly(nil)
+    LoadKata(statusSbl)
 end
 
 -- ============================================================
@@ -1092,54 +1108,110 @@ end
 -- ============================================================
 local function buildMiscUI()
     clearContainer()
-    local y = 12
+    local y = 10
 
-    -- Info overlay toggle
-    mkLabel(container, "Info Overlay", y, 20, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 24
+    -- Info Overlay toggle
+    mkLabel(container, "Info Overlay", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
 
-    mkToggle(container, "Show Info (kanan atas)", y, ShowInfo, function(v)
+    mkToggle(container, "Show Info", y, ShowInfo, function(v)
         ShowInfo = v
         if infoPanel then infoPanel.Visible = v end
     end)
-    y = y + 46
+    y = y + 40
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Reset saved words
-    mkLabel(container, "Data", y, 18, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 22
+    -- Data: RUW + RFW sejajar
+    mkLabel(container, "Data", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
 
-    local resetBtn = mkBtn(container, "🗑 Reset Saved Words", y, 38, Color3.fromRGB(220, 70, 70))
-    makeHover(resetBtn, Color3.fromRGB(220,70,70), Color3.fromRGB(240,100,100))
-    y = y + 48
+    local ruwBtn = mkHalfBtn(container, "🗑 RUW", 0, 8, y, 32, Color3.fromRGB(220, 70, 70))
+    local rfwBtn = mkHalfBtn(container, "💀 RFW", 0.5, 4, y, 32, Color3.fromRGB(160, 50, 200))
+    y = y + 40
 
-    local notifLbl = mkLabel(container, "", y, 20, 11, false, Color3.fromRGB(50,180,80))
-    y = y + 28
-
-    resetBtn.MouseButton1Click:Connect(function()
+    ruwBtn.MouseButton1Click:Connect(function()
         SavedWords  = {}
         UsedWords   = {}
         TotalUsed   = 0
         CurrentBill = "—"
-        CurrentSum  = "—"
-        notifLbl.Text = "✅ Saved words direset!"
-        task.delay(3, function()
-            if notifLbl and notifLbl.Parent then
-                notifLbl.Text = ""
+        CurrentSum  = "not run"
+        showToast("✅ Used words direset!", Color3.fromRGB(30, 140, 60))
+    end)
+
+    rfwBtn.MouseButton1Click:Connect(function()
+        local n = 0
+        for _ in pairs(FailWords) do n = n + 1 end
+        FailWords = {}
+        showToast("✅ Fail words direset! (" .. n .. " kata)", Color3.fromRGB(100, 30, 170))
+    end)
+
+    mkDivider(container, y)
+    y = y + 10
+
+    -- Tools: RL + BA sejajar
+    mkLabel(container, "Tools", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
+
+    local rlBtn = mkHalfBtn(container, "⚡ RL", 0, 8, y, 32, Color3.fromRGB(40, 160, 80))
+    local baBtn = mkHalfBtn(container, "🚫 BA", 0.5, 4, y, 32, Color3.fromRGB(200, 100, 20))
+    y = y + 40
+
+    -- Reduce Lag
+    rlBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            local lighting = game:GetService("Lighting")
+            lighting.GlobalShadows = false
+            lighting.FogEnd = 100000
+            for _, v in ipairs(lighting:GetChildren()) do
+                if v:IsA("BlurEffect") or v:IsA("SunRaysEffect")
+                   or v:IsA("ColorCorrectionEffect") or v:IsA("DepthOfFieldEffect")
+                   or v:IsA("BloomEffect") then
+                    pcall(function() v:Destroy() end)
+                end
             end
+            local myChar = LocalPlayer.Character
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if myChar and obj:IsDescendantOf(myChar) then continue end
+                if obj:IsA("ParticleEmitter") or obj:IsA("Beam") or obj:IsA("Trail") then
+                    pcall(function() obj:Destroy() end)
+                end
+            end
+        end)
+        showToast("✅ Reduce Lag applied!", Color3.fromRGB(20, 120, 50))
+    end)
+
+    -- Black All: hitamkan semua BasePart di workspace (reduce lag visual)
+    baBtn.MouseButton1Click:Connect(function()
+        showToast("⏳ Menghitamkan part...", Color3.fromRGB(40, 40, 50))
+        task.spawn(function()
+            local myChar = LocalPlayer.Character
+            local n = 0
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    if myChar and obj:IsDescendantOf(myChar) then continue end
+                    pcall(function()
+                        obj.Color      = Color3.fromRGB(0, 0, 0)
+                        obj.Material   = Enum.Material.SmoothPlastic
+                        obj.CastShadow = false
+                    end)
+                    n = n + 1
+                elseif obj:IsA("Decal") or obj:IsA("Texture") then
+                    pcall(function() obj.Transparency = 1 end)
+                end
+            end
+            showToast("✅ " .. n .. " part dihitamkan!", Color3.fromRGB(160, 70, 10))
         end)
     end)
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Info
-    local infoLbl = mkLabel(container, "LuluV V5 | Kosa Kata Indo", y, 18, 10, false, Color3.fromRGB(160,170,185))
-    infoLbl.TextXAlignment = Enum.TextXAlignment.Center
-    infoLbl.Size = UDim2.new(1, -16, 0, 18)
-    y = y + 22
+    local infoLbl2 = mkLabel(container, "LuluV V5 | Kosa Kata Indo", y, 14, 9, false, Color3.fromRGB(160,170,185))
+    infoLbl2.TextXAlignment = Enum.TextXAlignment.Center
+    infoLbl2.Size = UDim2.new(1, -16, 0, 14)
+    y = y + 20
 
     container.CanvasSize = UDim2.new(0, 0, 0, y)
 end
@@ -1149,17 +1221,16 @@ end
 -- ============================================================
 local function buildSettingsUI()
     clearContainer()
-    local y = 12
+    local y = 10
 
-    mkLabel(container, "Counter Akhiran", y, 20, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 24
+    mkLabel(container, "Counter Akhiran", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
 
-    -- Input suffix
-    mkLabel(container, "Input Akhiran", y, 18, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 22
+    mkLabel(container, "Input Akhiran", y, 14, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 16
 
     local inputBg = Instance.new("Frame")
-    inputBg.Size = UDim2.new(1, -16, 0, 38)
+    inputBg.Size = UDim2.new(1, -16, 0, 30)
     inputBg.Position = UDim2.new(0, 8, 0, y)
     inputBg.BackgroundColor3 = Color3.fromRGB(240, 244, 255)
     inputBg.BorderSizePixel = 0
@@ -1170,65 +1241,186 @@ local function buildSettingsUI()
     inputBox.Size = UDim2.new(1, -16, 1, -8)
     inputBox.Position = UDim2.new(0, 8, 0, 4)
     inputBox.BackgroundTransparency = 1
-    inputBox.Text = CounterSuffix
+    inputBox.Text = string.upper(CounterSuffix)
     inputBox.PlaceholderText = "Contoh: T"
     inputBox.Font = Enum.Font.GothamBold
-    inputBox.TextSize = 18
+    inputBox.TextSize = 14
     inputBox.TextColor3 = Color3.fromRGB(40, 120, 255)
     inputBox.PlaceholderColor3 = Color3.fromRGB(160, 170, 190)
     inputBox.BorderSizePixel = 0
     inputBox.ClearTextOnFocus = false
     inputBox.TextXAlignment = Enum.TextXAlignment.Center
     inputBox.Parent = inputBg
+    y = y + 36
+
+    -- Counter available label (update saat suffix berubah)
+    local counterAvLbl = mkLabel(container, "", y, 14, 10, false, Color3.fromRGB(40, 120, 255))
+    counterAvLbl.TextXAlignment = Enum.TextXAlignment.Left
+    y = y + 18
+
+    local function updateCounterAv()
+        if not CounterOn or CounterSuffix == "" then
+            counterAvLbl.Text = ""
+            return
+        end
+        local suffix = string.lower(CounterSuffix)
+        local count = 0
+        for _, word in ipairs(KOSA_KATA) do
+            if string.sub(word, -#suffix) == suffix then
+                count = count + 1
+            end
+        end
+        counterAvLbl.Text = "Counter available: " .. count .. " kata"
+    end
 
     inputBox.FocusLost:Connect(function()
-        -- Ambil semua huruf (bisa lebih dari 1)
         local val = inputBox.Text:match("^%s*(.-)%s*$") or ""
-        val = val:gsub("[^%a]", "") -- hapus non-huruf
+        val = val:gsub("[^%a]", "")
         CounterSuffix = string.lower(val)
         inputBox.Text = string.upper(CounterSuffix)
+        updateCounterAv()
     end)
-    y = y + 48
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Toggle Counter
-    mkToggle(container, "Counter", y, CounterOn, function(v)
+    mkToggle(container, "Counter ON", y, CounterOn, function(v)
         CounterOn = v
+        updateCounterAv()
     end)
-    y = y + 46
+    y = y + 40
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Penjelasan
-    local desc1 = mkLabel(container,
-        "Counter ON: pilih kata yang berakhiran",
-        y, 18, 11, false, Color3.fromRGB(130,140,160))
-    y = y + 20
-    local desc2 = mkLabel(container,
-        "huruf yang diinput. Fallback ke kata",
-        y, 18, 11, false, Color3.fromRGB(130,140,160))
-    y = y + 20
-    local desc3 = mkLabel(container,
-        "biasa kalau tidak ada yang cocok.",
-        y, 18, 11, false, Color3.fromRGB(130,140,160))
-    y = y + 28
+    local desc1 = mkLabel(container, "Counter ON: pilih kata berakhiran huruf yg diinput.", y, 14, 10, false, Color3.fromRGB(130,140,160))
+    y = y + 16
+    local desc2 = mkLabel(container, "Fallback ke kata biasa kalau tidak ada cocok.", y, 14, 10, false, Color3.fromRGB(130,140,160))
+    y = y + 22
 
     mkDivider(container, y)
-    y = y + 12
+    y = y + 10
 
-    -- Priority Frenly
-    mkLabel(container, "Frenly Priority", y, 20, 11, false, Color3.fromRGB(100,110,140))
-    y = y + 24
+    mkLabel(container, "Source Priority", y, 16, 10, false, Color3.fromRGB(100,110,140))
+    y = y + 18
 
-    mkToggle(container, "Priority Frenly Used", y, PriorityFrenly, function(v)
-        PriorityFrenly = v
+    -- Dropdown "Choose priority" — langsung dari KATA_SOURCES (tidak perlu fetch)
+    local options = {"— pilih —"}
+    for _, src in ipairs(KATA_SOURCES) do
+        table.insert(options, src.name)
+    end
+
+    -- Row dropdown
+    local ddRow = Instance.new("Frame")
+    ddRow.Size = UDim2.new(1, -16, 0, 32)
+    ddRow.Position = UDim2.new(0, 8, 0, y)
+    ddRow.BackgroundColor3 = Color3.fromRGB(245, 247, 252)
+    ddRow.BorderSizePixel = 0
+    ddRow.ClipsDescendants = false
+    ddRow.Parent = container
+    mkCorner(ddRow, 8)
+
+    local ddLbl = Instance.new("TextLabel")
+    ddLbl.Size = UDim2.new(0.45, 0, 1, 0)
+    ddLbl.Position = UDim2.new(0, 8, 0, 0)
+    ddLbl.BackgroundTransparency = 1
+    ddLbl.Text = "Choose priority"
+    ddLbl.Font = Enum.Font.Gotham
+    ddLbl.TextSize = 10
+    ddLbl.TextColor3 = Color3.fromRGB(40, 50, 70)
+    ddLbl.TextXAlignment = Enum.TextXAlignment.Left
+    ddLbl.Parent = ddRow
+
+    local selBtn = Instance.new("TextButton")
+    selBtn.Size = UDim2.new(0.55, -12, 1, -6)
+    selBtn.Position = UDim2.new(0.45, 4, 0, 3)
+    selBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+    selBtn.Text = (SelectedPriorityName ~= "" and SelectedPriorityName or "— pilih —") .. " ▾"
+    selBtn.Font = Enum.Font.GothamBold
+    selBtn.TextSize = 10
+    selBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selBtn.BorderSizePixel = 0
+    selBtn.TextTruncate = Enum.TextTruncate.AtEnd
+    selBtn.Parent = ddRow
+    mkCorner(selBtn, 6)
+
+    local dropOpen = false
+    local dropMenu  = nil
+
+    local function closeMenu()
+        if dropMenu then pcall(function() dropMenu:Destroy() end) dropMenu = nil end
+        dropOpen = false
+    end
+
+    selBtn.MouseButton1Click:Connect(function()
+        if dropOpen then closeMenu() return end
+        dropOpen = true
+
+        local itemH  = 26
+        local maxH   = math.min(#options, 6) * itemH
+        dropMenu = Instance.new("Frame")
+        dropMenu.Size = UDim2.new(0, selBtn.AbsoluteSize.X, 0, maxH)
+        local fp = mainFrame.AbsolutePosition
+        local sp = selBtn.AbsolutePosition
+        dropMenu.Position = UDim2.new(0, sp.X - fp.X, 0, sp.Y - fp.Y + selBtn.AbsoluteSize.Y + 2)
+        dropMenu.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        dropMenu.BorderSizePixel = 0
+        dropMenu.ZIndex = 200
+        dropMenu.ClipsDescendants = true
+        dropMenu.Parent = mainFrame
+        mkCorner(dropMenu, 6)
+
+        local ds = Instance.new("Frame")
+        ds.Size = UDim2.new(1, 6, 1, 6)
+        ds.Position = UDim2.new(0, -3, 0, -3)
+        ds.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
+        ds.BackgroundTransparency = 0.85
+        ds.BorderSizePixel = 0
+        ds.ZIndex = 199
+        ds.Parent = dropMenu
+        mkCorner(ds, 8)
+
+        local scroll = Instance.new("ScrollingFrame")
+        scroll.Size = UDim2.new(1, 0, 1, 0)
+        scroll.CanvasSize = UDim2.new(0, 0, 0, #options * itemH)
+        scroll.BackgroundTransparency = 1
+        scroll.BorderSizePixel = 0
+        scroll.ScrollBarThickness = 3
+        scroll.ScrollBarImageColor3 = Color3.fromRGB(40, 120, 255)
+        scroll.ZIndex = 201
+        scroll.Parent = dropMenu
+
+        for i, opt in ipairs(options) do
+            local ob = Instance.new("TextButton")
+            ob.Size = UDim2.new(1, 0, 0, itemH)
+            ob.Position = UDim2.new(0, 0, 0, (i-1) * itemH)
+            ob.BackgroundTransparency = 1
+            ob.Text = opt
+            ob.Font = Enum.Font.Gotham
+            ob.TextSize = 10
+            ob.TextColor3 = (opt == SelectedPriorityName) and Color3.fromRGB(40,120,255) or Color3.fromRGB(40,50,70)
+            ob.TextXAlignment = Enum.TextXAlignment.Center
+            ob.ZIndex = 202
+            ob.Parent = scroll
+            makeHover(ob, Color3.fromRGB(255,255,255), Color3.fromRGB(235,242,255))
+            ob.BackgroundTransparency = 1
+
+            ob.MouseButton1Click:Connect(function()
+                SelectedPriorityName = (opt == "— pilih —") and "" or opt
+                selBtn.Text = opt .. " ▾"
+                closeMenu()
+            end)
+        end
     end)
-    y = y + 46
+    y = y + 40
+
+    mkToggle(container, "On Priority", y, PriorityOn, function(v)
+        PriorityOn = v
+    end)
+    y = y + 40
 
     container.CanvasSize = UDim2.new(0, 0, 0, y)
+    updateCounterAv()
 end
 
 -- ============================================================
@@ -1284,14 +1476,14 @@ makeDraggable(lotusBtn,  lotusBtn)
 -- RESIZE
 -- ============================================================
 local resizeHandle = Instance.new("Frame")
-resizeHandle.Size = UDim2.new(0, 18, 0, 18)
+resizeHandle.Size = UDim2.new(0, 14, 0, 14)
 resizeHandle.AnchorPoint = Vector2.new(1, 1)
 resizeHandle.Position = UDim2.new(1, -4, 1, -4)
 resizeHandle.BackgroundColor3 = Color3.fromRGB(40, 120, 255)
 resizeHandle.BackgroundTransparency = 0.4
 resizeHandle.BorderSizePixel = 0
 resizeHandle.Parent = mainFrame
-mkCorner(resizeHandle, 5)
+mkCorner(resizeHandle, 4)
 
 local resizing, initSz, resSt
 resizeHandle.InputBegan:Connect(function(inp)
@@ -1310,8 +1502,8 @@ UserInputService.InputChanged:Connect(function(inp)
     or inp.UserInputType == Enum.UserInputType.Touch) then
         local d = inp.Position - resSt
         mainFrame.Size = UDim2.new(
-            0, math.clamp(initSz.X.Offset + d.X, 380, 800),
-            0, math.clamp(initSz.Y.Offset + d.Y, 300, 650)
+            0, math.clamp(initSz.X.Offset + d.X, 260, 600),
+            0, math.clamp(initSz.Y.Offset + d.Y, 220, 500)
         )
     end
 end)
@@ -1353,4 +1545,10 @@ print("================================")
 print("🌸 LuluV V5 | Kosa Kata Indo")
 print("================================")
 print("📋 Changelog:")
-print("mode update&Change")
+print("+ Shorttext/Longtext/Any selector")
+print("+ RFW (Reset Fail Words)")
+print("+ RL (Reduce Lag) & BA (Black All)")
+print("+ Counter available in Settings")
+print("+ FailWords local blacklist")
+print("+ Fix visual toggle")
+print("+ UI change ~2/3 before")
